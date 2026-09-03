@@ -170,13 +170,13 @@ go build -trimpath -ldflags "-s -w" -o codex-image2/bin/codex-image2-windows-amd
 
 ## 超简单的方式
 
-如果觉得安装 Skill 和配置环境变量还是太麻烦，也可以直接使用我开发的网站：
+如果觉得安装 Skill 和配置环境变量还是太麻烦，也可以直接使用鹊桥的在线生图页面：
 
-### [https://ffzd.ai/](https://ffzd.ai/)
+### [https://cdn.5202828.xyz](https://cdn.5202828.xyz)
 
-支持文生图和图生图，打开网页即可使用。
+登录鹊桥后打开 [在线生图](https://cdn.5202828.xyz/draw/)，支持文生图和图生图，同样使用 `gpt-image-2`，打开网页即可使用，不需要安装任何东西。
 
-![ffzd.ai](https://image.fengfengzhidao.com/rj_102520260706151233013.png)
+本 Skill 配置里的 `CODEX_API_URL` 也可以直接填鹊桥地址 `https://cdn.5202828.xyz/v1`，密钥使用在鹊桥创建的令牌。
 
 ## 常见问题
 
