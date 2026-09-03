@@ -1,6 +1,17 @@
-# Codex Image2 Skill
+# Codex Image2 Skill（鹊桥转存）
 
 让 Codex 通过自定义 API 地址和密钥，直接调用 `gpt-image-2` 生成或编辑图片。
+
+## 关于本仓库
+
+本仓库是 **鹊桥** 对开源项目 [fengfengzhidao/codex-image2-skill](https://github.com/fengfengzhidao/codex-image2-skill) 的 **转存备份**。
+
+- 原作者：[fengfengzhidao](https://github.com/fengfengzhidao)，原仓库地址：https://github.com/fengfengzhidao/codex-image2-skill
+- 转存目的：鹊桥的用户会长期通过本地址安装这个 Skill，为避免原仓库失效、删除或不可访问导致安装失败，这里做了一份完整转存。
+- 转存内容：Skill 目录、可执行文件、源码和许可证与原仓库一致，仓库名和 Skill 名（`codex-image2`）均未改动，仅在本 README 中补充了转存说明并把安装地址换成了本仓库。
+- 许可证：沿用原项目的 [MIT](LICENSE) 许可，版权归原作者所有。
+
+如果你需要最新版本或想参与开发，请优先访问原仓库。
 
 ## 为什么做这个 Skill
 
@@ -40,7 +51,7 @@
 
 ```text
 请帮我安装这个 Skill：
-https://github.com/fengfengzhidao/codex-image2-skill
+https://github.com/daifei-0/codex-image2-skill
 ```
 
 也可以手动安装。
@@ -48,14 +59,14 @@ https://github.com/fengfengzhidao/codex-image2-skill
 Windows PowerShell：
 
 ```powershell
-git clone https://github.com/fengfengzhidao/codex-image2-skill.git
+git clone https://github.com/daifei-0/codex-image2-skill.git
 Copy-Item codex-image2-skill\codex-image2 "$HOME\.codex\skills\codex-image2" -Recurse
 ```
 
 macOS / Linux：
 
 ```bash
-git clone https://github.com/fengfengzhidao/codex-image2-skill.git
+git clone https://github.com/daifei-0/codex-image2-skill.git
 cp -R codex-image2-skill/codex-image2 ~/.codex/skills/codex-image2
 ```
 
