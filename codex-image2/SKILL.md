@@ -47,7 +47,7 @@ Bare 「Grok」 means `grok-imagine-image-2.0`, not video.
 | Grok 高质量 / grok-imagine-image-quality | `--model grok-imagine-image-quality` |
 | grok-imagine / Grok Imagine（点名这个 id） | `--model grok-imagine` |
 
-Grok 画质 still uses `--size 1K|2K|4K`. The CLI sends Grok `resolution` `1k`/`2k`. **Grok has no 4K**; if the user asks 4K, still pass `--size 4K` and the CLI clamps to 2K. Do not invent a 4K pixel size for Grok.
+Grok 画质仍用 `--size 1K|2K|4K`。官方没有 4K。若用户要 2K 或 4K，仍然传 `--size`；出图后必须看 `actual_size`。JSON 里如果有 `warning`，原句告诉用户，不要把 1K 图说成 2K/4K。
 
 If this thread already chose a model or size and the new message does not change it, keep using that choice. If they name a different model or 画质, switch immediately for this call.
 
@@ -64,7 +64,7 @@ If this thread already chose a model or size and the new message does not change
 5. Run the selected executable with `generate` for one prompt, `edit` for changes to existing images, or `generate-batch` for JSONL jobs.
 6. Inspect each output for subject, composition, text accuracy, constraints, and visible artifacts.
 7. If revision is needed, change one targeted aspect per iteration and re-check.
-8. Report absolute output paths, the final prompt or prompt set, requested size, resolved pixels, quality, and model.
+8. Report absolute output paths, the final prompt or prompt set, requested size, actual pixels (`actual_size`), quality, and model. If the JSON has `warning`, quote it to the user verbatim. A 200 response can still be the wrong resolution.
 
 ## Prompt structure
 

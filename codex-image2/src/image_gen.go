@@ -10,6 +10,9 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"image"
+	_ "image/jpeg"
+	_ "image/png"
 	"io"
 	"mime/multipart"
 	"net/http"
@@ -279,6 +282,125 @@ func resultJSON(spec imageSpec, outputs any) map[string]any {
 	return out
 }
 
+func requestedBand(size string) string {
+	size = strings.TrimSpace(size)
+	u := strings.ToUpper(size)
+	if u == "1K" || u == "2K" || u == "4K" {
+		return u
+	}
+	if strings.EqualFold(size, "auto") || size == "" {
+		return "1K"
+	}
+	resolved, err := resolveSize(size)
+	if err != nil {
+		return ""
+	}
+	parts := strings.Split(strings.ToLower(resolved), "x")
+	if len(parts) != 2 {
+		return ""
+	}
+	w, e1 := strconv.Atoi(parts[0])
+	h, e2 := strconv.Atoi(parts[1])
+	if e1 != nil || e2 != nil {
+		return ""
+	}
+	return qualityBand(w, h)
+}
+
+func qualityBand(w, h int) string {
+	long := w
+	if h > w {
+		long = h
+	}
+	switch {
+	case long >= 3000:
+		return "4K"
+	case long >= 1800:
+		return "2K"
+	default:
+		return "1K"
+	}
+}
+
+func bandRank(band string) int {
+	switch band {
+	case "4K":
+		return 3
+	case "2K":
+		return 2
+	default:
+		return 1
+	}
+}
+
+func inspectImage(data []byte) (int, int, string) {
+	cfg, format, err := image.DecodeConfig(bytes.NewReader(data))
+	if err != nil {
+		return 0, 0, ""
+	}
+	return cfg.Width, cfg.Height, format
+}
+
+func attachActual(spec *imageSpec, images [][]byte, asked string) {
+	if spec == nil || len(images) == 0 {
+		return
+	}
+	w, h, format := inspectImage(images[0])
+	if w < 1 || h < 1 {
+		return
+	}
+	actual := qualityBand(w, h)
+	spec.extra["actual_size"] = fmt.Sprintf("%dx%d", w, h)
+	spec.extra["actual_format"] = format
+	spec.extra["actual_quality"] = actual
+	askedBand := requestedBand(asked)
+	if askedBand == "" || bandRank(askedBand) <= bandRank(actual) {
+		return
+	}
+	warn := fmt.Sprintf("上游 API 不支持 %s 的 %s 画质（未按请求分辨率出图，实际 %dx%d，相当于 %s）。请改用 %s，或换 GPT 生图模型。", spec.model, askedBand, w, h, actual, actual)
+	spec.extra["warning"] = warn
+	fmt.Fprintln(os.Stderr, "warning:", warn)
+}
+
+func stringifyErrorValue(v any) string {
+	switch t := v.(type) {
+	case string:
+		return strings.TrimSpace(t)
+	case map[string]any:
+		if msg, ok := t["message"]; ok {
+			return stringifyErrorValue(msg)
+		}
+	}
+	return ""
+}
+
+func extractJSONError(body []byte) string {
+	var top map[string]any
+	if err := json.Unmarshal(body, &top); err != nil {
+		s := strings.TrimSpace(string(body))
+		if len(s) > 240 {
+			s = s[:240]
+		}
+		return s
+	}
+	if msg := stringifyErrorValue(top["error"]); msg != "" {
+		return msg
+	}
+	return stringifyErrorValue(top["message"])
+}
+
+func formatAPIError(status int, body []byte) string {
+	msg := extractJSONError(body)
+	if msg == "" {
+		return fmt.Sprintf("上游 API 返回 HTTP %d", status)
+	}
+	lower := strings.ToLower(msg)
+	if strings.Contains(lower, "size") || strings.Contains(lower, "resolution") || strings.Contains(lower, "dimension") || strings.Contains(lower, "4k") || strings.Contains(lower, "2k") || strings.Contains(lower, "画质") {
+		return fmt.Sprintf("上游 API 不支持这次请求的画质或尺寸：%s", msg)
+	}
+	return fmt.Sprintf("上游 API 返回 HTTP %d：%s", status, msg)
+}
+
 func validateCommon(args commonArgs) error {
 	if _, err := resolveModel(args.model); err != nil {
 		return err
@@ -380,7 +502,7 @@ func doRequest(client *http.Client, makeRequest func() (*http.Request, error), m
 			if resp.StatusCode >= 200 && resp.StatusCode < 300 {
 				return body, nil
 			}
-			last = fmt.Sprintf("API request failed with HTTP %d", resp.StatusCode)
+			last = formatAPIError(resp.StatusCode, body)
 			if !retryable[resp.StatusCode] || attempt == maxAttempts {
 				return nil, errors.New(last)
 			}
@@ -489,6 +611,7 @@ func generate(prompt, out string, args commonArgs) (map[string]any, error) {
 	if err != nil {
 		return nil, err
 	}
+	attachActual(&spec, images, args.size)
 	outputs, err := saveImages(images, paths)
 	if err != nil {
 		return nil, err
@@ -578,6 +701,7 @@ func edit(prompt string, imagePaths []string, mask, out string, args commonArgs)
 	if err != nil {
 		return nil, err
 	}
+	attachActual(&spec, images, args.size)
 	outputs, err := saveImages(images, paths)
 	if err != nil {
 		return nil, err

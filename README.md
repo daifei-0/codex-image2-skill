@@ -125,9 +125,9 @@ export CODEX_API_KEY="你的API密钥"
 
 | 你在对话里说 | GPT | Grok |
 | --- | --- | --- |
-| 不提画质 | `1K`（1024×1024） | `1k` |
-| 画质 2K | `2048×2048` | `2k` |
-| 画质 4K | `3840×2160` | 没有 4K，落到 `2k` |
+| 不提画质 | `1K`（约 1024×1024） | `1k`（实测 1024×1024） |
+| 画质 2K | `2048×2048` | 会请求 `2k`；鹊桥实测仍返回 1K，Skill 会说明 |
+| 画质 4K | 约 `3584×2016`（4K 档） | 官方无 4K；鹊桥实测仍返回 1K，Skill 会说明 |
 
 同一段对话里下一句换说法就行，立即生效，不用重开客户端。
 
@@ -300,9 +300,11 @@ go build -trimpath -ldflags "-s -w" -o codex-image2/bin/codex-image2-windows-amd
 
 支持截图里的生图模型：GPT 四个（`gpt-image-2`、`gpt-image-2.5`、`gpt-image-2.5-flare`、`gpt-image-2.5-sunburst`）和 Grok 三个（`grok-imagine`、`grok-imagine-image-2.0`、`grok-imagine-image-quality`）。**不支持** `grok-imagine-video` 和 `grok-imagine-video-1.5`。
 
-### Grok 能开 4K 吗？
+### Grok 能开 2K / 4K 吗？
 
-不能。Grok Imagine 只有 `1k` 和 `2k`。对话里说 4K 时，Skill 会按 2K 发出去。
+Grok Imagine 官方分辨率只有 `1k` 和 `2k`。在鹊桥上实测：三个 Grok 生图模型无论请求 1K、2K 还是 4K，返回的图都是 **1024×1024**。Skill 仍会把图画下来，但会明确提示「上游 API 不支持该模型的 2K/4K 画质」，不会假装已经出了 2K/4K。
+
+GPT 四个生图模型实测可以出 1K / 2K；请求 4K 时上游会落到约 `3584×2016`（仍按 4K 档，不是严格 3840×2160）。
 
 ### 接口返回 524 或超时
 
