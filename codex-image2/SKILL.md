@@ -47,7 +47,7 @@ Bare 「Grok」 means `grok-imagine-image-2.0`, not video.
 | Grok 高质量 / grok-imagine-image-quality | `--model grok-imagine-image-quality` |
 | grok-imagine / Grok Imagine（点名这个 id） | `--model grok-imagine` |
 
-Grok 画质仍用 `--size 1K|2K|4K`。官方没有 4K。若用户要 2K 或 4K，仍然传 `--size`；出图后必须看 `actual_size`。JSON 里如果有 `warning`，原句告诉用户，不要把 1K 图说成 2K/4K。
+Grok 画质仍用 `--size 1K|2K|4K`。官方没有 4K。2K 应出 2048×2048；4K 会打到上游最高档（约 2816×1584）。出图后必须看 `actual_size`。JSON 里如果有 `warning`，原句告诉用户，不要把更低档的图说成用户要的那一档。
 
 If this thread already chose a model or size and the new message does not change it, keep using that choice. If they name a different model or 画质, switch immediately for this call.
 

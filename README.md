@@ -22,7 +22,7 @@
 - **对话里切换生图模型（不含 Video）**
   - GPT：`gpt-image-2`（默认）、`gpt-image-2.5`、`gpt-image-2.5-flare`、`gpt-image-2.5-sunburst`
   - Grok：`grok-imagine`、`grok-imagine-image-2.0`（说「Grok」时默认这个）、`grok-imagine-image-quality`
-- **对话里切换画质**：不说就用 `1K`。GPT 支持 `1K` / `2K` / `4K`；Grok 只支持 `1K` / `2K`（说 4K 会落到 2K）
+- **对话里切换画质**：不说就用 `1K`。GPT 支持 `1K` / `2K` / `4K`；Grok 官方是 `1K` / `2K`，说 4K 会打到上游最高档（约 2816×1584，不是真 4K）
 - 不用改配置文件，也不用重启 Codex
 - 可选 PNG Mask 局部编辑
 - JSONL 并发批量生图，单条任务可覆盖 `model` / `size`
@@ -126,8 +126,8 @@ export CODEX_API_KEY="你的API密钥"
 | 你在对话里说 | GPT | Grok |
 | --- | --- | --- |
 | 不提画质 | `1K`（约 1024×1024） | `1k`（实测 1024×1024） |
-| 画质 2K | `2048×2048` | 会请求 `2k`；鹊桥实测仍返回 1K，Skill 会说明 |
-| 画质 4K | 约 `3584×2016`（4K 档） | 官方无 4K；鹊桥实测仍返回 1K，Skill 会说明 |
+| 画质 2K | `2048×2048` | `2048×2048`（`resolution=2k` + `size=2048x2048`） |
+| 画质 4K | 约 `3584×2016`（4K 档，不是严格 3840×2160） | 官方无 4K；会打到上游最高档，约 `2816×1584`，Skill 会说明不是真 4K |
 
 同一段对话里下一句换说法就行，立即生效，不用重开客户端。
 
@@ -248,7 +248,7 @@ chmod +x codex-image2/bin/codex-image2-darwin-*
   --out "output/imagegen/nebula-grok.png"
 ```
 
-GPT 的 `--size` 对照：`1K` → `1024x1024`，`2K` → `2048x2048`，`4K` → `3840x2160`。Grok 把 `1K`/`2K` 收成 `resolution=1k|2k`，没有 4K。`--quality` 仍是 `low|medium|high|auto`，和画质档位不是一回事。
+GPT 的 `--size` 对照：`1K` → `1024x1024`，`2K` → `2048x2048`，`4K` → `3840x2160`（上游常见落地 `3584x2016`）。Grok 同时发 `resolution` 和 `size`：`1K` → `1k`/`1024x1024`，`2K` → `2k`/`2048x2048`，`4K` → `2k`/`3840x2160`（6rr 最高约 `2816x1584`）。`--quality` 仍是 `low|medium|high|auto`，和画质档位不是一回事。
 
 编辑图片：
 
@@ -302,9 +302,12 @@ go build -trimpath -ldflags "-s -w" -o codex-image2/bin/codex-image2-windows-amd
 
 ### Grok 能开 2K / 4K 吗？
 
-Grok Imagine 官方分辨率只有 `1k` 和 `2k`。在鹊桥上实测：三个 Grok 生图模型无论请求 1K、2K 还是 4K，返回的图都是 **1024×1024**。Skill 仍会把图画下来，但会明确提示「上游 API 不支持该模型的 2K/4K 画质」，不会假装已经出了 2K/4K。
+Grok Imagine 官方分辨率只有 `1k` 和 `2k`，没有 4K。鹊桥侧已经打开 Grok 通道的 body 透传，并把 OpenAI 的 `size` 补成 6rr 认的 `resolution`。现在：
 
-GPT 四个生图模型实测可以出 1K / 2K；请求 4K 时上游会落到约 `3584×2016`（仍按 4K 档，不是严格 3840×2160）。
+- 2K 会出 **2048×2048**
+- 4K 没有真 4K，会出上游最高档，约 **2816×1584**。Skill 仍会提示这不是 4K，不会把 2K 图说成 4K
+
+GPT 四个生图模型 1K / 2K 按像素出图；请求 4K 时 OpenAI/6rr 会落到约 `3584×2016`（仍按 4K 档计，不是严格 3840×2160）。这不是鹊桥把 `size` 剥掉，也不是肥嘟嘟改了尺寸。
 
 ### 接口返回 524 或超时
 

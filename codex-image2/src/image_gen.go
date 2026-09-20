@@ -189,32 +189,37 @@ func resolveModel(model string) (string, error) {
 	return model, nil
 }
 
-func grokResolution(size string) (string, string) {
+func grokResolution(size string) (res, pixel, note string) {
 	size = strings.TrimSpace(size)
 	if size == "" {
 		size = defaultSize
 	}
 	switch strings.ToUpper(size) {
 	case "1K", "AUTO":
-		return "1k", ""
+		return "1k", "1024x1024", ""
 	case "2K":
-		return "2k", ""
+		return "2k", "2048x2048", ""
 	case "4K":
-		return "2k", "Grok Imagine supports 1k and 2k only; 4K was clamped to 2k"
+		// Do not send resolution=4k: 6rr ignores it and returns 1024x1024.
+		// size=3840x2160 is the highest slot (typically 2816x1584).
+		return "2k", "3840x2160", "Grok Imagine has no 4K; requested the highest available slot"
 	}
 	resolved, err := resolveSize(size)
 	if err != nil {
-		return "1k", ""
+		return "1k", "1024x1024", ""
 	}
 	parts := strings.Split(strings.ToLower(resolved), "x")
 	if len(parts) == 2 {
 		w, e1 := strconv.Atoi(parts[0])
 		h, e2 := strconv.Atoi(parts[1])
+		if e1 == nil && e2 == nil && (w >= 3000 || h >= 3000) {
+			return "2k", resolved, ""
+		}
 		if e1 == nil && e2 == nil && (w >= 1536 || h >= 1536) {
-			return "2k", ""
+			return "2k", resolved, ""
 		}
 	}
-	return "1k", ""
+	return "1k", "1024x1024", ""
 }
 
 type imageSpec struct {
@@ -236,11 +241,16 @@ func prepareImageRequest(prompt string, args commonArgs) (imageSpec, error) {
 		extra:   map[string]any{"model": model, "size": args.size},
 	}
 	if isGrokImage(model) {
-		res, note := grokResolution(args.size)
+		res, pixel, note := grokResolution(args.size)
+		// new-api drops unknown fields like resolution unless pass_through is on.
+		// 6rr honors both resolution=2k and OpenAI size=2048x2048; send both.
 		spec.payload["resolution"] = res
+		spec.payload["size"] = pixel
 		spec.fields["resolution"] = res
+		spec.fields["size"] = pixel
 		spec.extra["family"] = "grok"
 		spec.extra["resolution"] = res
+		spec.extra["resolved_size"] = pixel
 		if note != "" {
 			spec.extra["note"] = note
 		}
@@ -901,8 +911,8 @@ func usage() {
 	fmt.Fprintln(os.Stderr, "GPT:   gpt-image-2  gpt-image-2.5  gpt-image-2.5-flare  gpt-image-2.5-sunburst")
 	fmt.Fprintln(os.Stderr, "Grok:  grok-imagine  grok-imagine-image-2.0  grok-imagine-image-quality")
 	fmt.Fprintln(os.Stderr, "Video models are not supported.")
-	fmt.Fprintln(os.Stderr, "GPT size: 1K=1024x1024  2K=2048x2048  4K=3840x2160")
-	fmt.Fprintln(os.Stderr, "Grok resolution: 1K or 2K (4K clamps to 2K)")
+	fmt.Fprintln(os.Stderr, "GPT size: 1K=1024x1024  2K=2048x2048  4K=3840x2160 (upstream may deliver 3584x2016)")
+	fmt.Fprintln(os.Stderr, "Grok: 1K=1024  2K=2048  4K requests highest available slot (not true 4K)")
 }
 
 func main() {
