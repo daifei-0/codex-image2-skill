@@ -1,6 +1,6 @@
 # Codex Image2 Skill（鹊桥转存）
 
-让 Codex 通过自定义 API 地址和密钥生成或编辑图片。默认模型是 `gpt-image-2`，默认画质是 `1K`；调用时也可以改成其他模型（例如 `gpt-image-2.5`）以及 `2K` / `4K`。
+让 Codex 通过自定义 API 地址和密钥生成或编辑图片。默认模型是 GPT Image 2（`gpt-image-2`），默认画质是 `1K`。换模型、换画质请在对话里直接说，例如「用 2.5」「画质 4K」，不要改配置文件，也不用重启客户端。
 
 ## 关于本仓库
 
@@ -8,7 +8,7 @@
 
 - 原作者：[fengfengzhidao](https://github.com/fengfengzhidao)，原仓库地址：https://github.com/fengfengzhidao/codex-image2-skill
 - 转存目的：鹊桥的用户会长期通过本地址安装这个 Skill，为避免原仓库失效、删除或不可访问导致安装失败，这里做了一份完整转存。
-- 转存内容：Skill 目录、可执行文件、源码和许可证与原仓库一致，仓库名和 Skill 名（`codex-image2`）均未改动，仅在本 README 中补充了转存说明并把安装地址换成了本仓库。
+- 转存内容：Skill 目录、可执行文件、源码和许可证来自原仓库；仓库名和 Skill 名（`codex-image2`）未改。本 README 补充了转存说明、安装地址，以及对话里切换生图模型和 1K/2K/4K 画质的用法。
 - 许可证：沿用原项目的 [MIT](LICENSE) 许可，版权归原作者所有。
 
 如果你需要最新版本或想参与开发，请优先访问原仓库。
@@ -30,8 +30,8 @@
 
 - 文生图
 - 单图或多图编辑
-- 可选生图模型：默认 `gpt-image-2`，用 `--model` 换成 `gpt-image-2.5` 或其他网关模型名
-- 可选画质：默认 `1K`，用 `--size 1K|2K|4K` 切换（也仍支持 `auto` 和 `WIDTHxHEIGHT`）
+- **对话里切换生图模型**：不说就用 `gpt-image-2`；说「用 2.5」就换成 `gpt-image-2.5`
+- **对话里切换画质**：不说就用 `1K`；说「画质 2K / 4K」就换分辨率。不用改配置文件，也不用重启 Codex
 - 可选 PNG Mask 局部编辑
 - JSONL 并发批量生图，单条任务可覆盖 `model` / `size`
 - 支持 Base64 和 URL 两种图片响应
@@ -91,7 +91,7 @@ https://example.com
 
 ![配置 Codex Image2 环境变量](http://image.fengfengzhidao.com/fengfeng_110920260715224031.png?key=fengfengbuzhidao)
 
-> 配置完成后，需要完全退出并重新启动 Codex，新的环境变量才会生效。
+> **重启只针对 API 地址和密钥。** 配完这两项后完全退出再打开 Codex，密钥才会生效。之后换模型、换画质都在对话里说，不要去改配置文件，也不要再重启。
 
 macOS / Linux 用户可以将以下内容加入自己的 shell 配置文件：
 
@@ -100,34 +100,75 @@ export CODEX_API_URL="你的API地址"
 export CODEX_API_KEY="你的API密钥"
 ```
 
-### 3. 指定 Skill 生图
+### 3. 对话里生图：怎么切换模型、怎么切换画质
 
-重新启动 Codex 后，在请求中指定 `$codex-image2` 即可：
+安装好 Skill、配好密钥并重启过一次 Codex 之后，日常用法就是跟它说话。**不要把模型或画质写进配置文件。** 每次请求点名即可，Skill 会给这一次调用带上对应参数。
+
+默认（这句话里不提模型和画质）：
+
+- 模型：`gpt-image-2`（GPT Image 2）
+- 画质：`1K`
+
+| 你在对话里说 | 这一次实际用 |
+| --- | --- |
+| 不提模型和画质 | `gpt-image-2` + `1K` |
+| 用 2.5 / GPT Image 2.5 / `gpt-image-2.5` | `gpt-image-2.5` + 默认 `1K` |
+| 画质 2K | 当前模型 + `2K` |
+| 画质 4K | 当前模型 + `4K` |
+| 模型 2.5，画质 4K | `gpt-image-2.5` + `4K` |
+
+同一段对话里下一句换说法就行，立即生效，不用重开客户端。
+
+默认生图：
 
 ```text
 使用 $codex-image2 生成一张图片：
 一只戴着宇航员头盔的橘猫站在月球表面，远处可以看到地球，电影感灯光。
 ```
 
-不指定时走默认：模型 `gpt-image-2`，画质 `1K`。需要换成 2.5 或更高分辨率时直接说出来即可，例如：
+换成 GPT Image 2.5：
 
 ```text
-使用 $codex-image2，模型用 gpt-image-2.5，画质 4K：
+使用 $codex-image2，模型用 2.5，生成一张图片：
 一只戴着宇航员头盔的橘猫站在月球表面，远处可以看到地球，电影感灯光。
 ```
 
-![使用 Codex Image2 生图](http://image.fengfengzhidao.com/fengfeng_110920260715224141.png?key=fengfengbuzhidao)
-
-改图示例：
+换成 4K 画质：
 
 ```text
-使用 $codex-image2 修改这张图片：
+使用 $codex-image2，画质 4K，生成一张图片：
+一只戴着宇航员头盔的橘猫站在月球表面，远处可以看到地球，电影感灯光。
+```
+
+模型和画质一起改：
+
+```text
+使用 $codex-image2，模型 gpt-image-2.5，画质 4K：
+一只戴着宇航员头盔的橘猫站在月球表面，远处可以看到地球，电影感灯光。
+```
+
+同一轮对话里接着换：
+
+```text
+还是这只猫，改用 2.5，画质 2K 再出一张。
+```
+
+改图也可以带上模型和画质：
+
+```text
+使用 $codex-image2，画质 2K，修改这张图片：
 只把背景替换成雪山，人物、服装、姿势和构图保持不变。
 ```
 
+画质对照：`1K` → `1024x1024`，`2K` → `2048x2048`，`4K` → `3840x2160`。
+
+![使用 Codex Image2 生图](http://image.fengfengzhidao.com/fengfeng_110920260715224141.png?key=fengfengbuzhidao)
+
 ## CLI 用法
 
-通常直接在 Codex 中指定 Skill 即可，不需要手动执行 CLI。下面的命令适合调试或自动化。
+通常直接在 Codex 对话里指定 `$codex-image2`，并在同一句话里说模型和画质。不需要手动执行 CLI，也不需要为切换模型和画质改任何文本配置。
+
+下面的命令只适合调试或自动化。
 
 选择与你的系统匹配的文件：
 
@@ -208,7 +249,11 @@ go build -trimpath -ldflags "-s -w" -o codex-image2/bin/codex-image2-windows-amd
 
 ### 配置后仍提示没有 API Key
 
-完全退出 Codex 后重新启动。已经打开的 Codex 进程不会自动读取新设置的用户环境变量。
+完全退出 Codex 后重新启动。已经打开的 Codex 进程不会自动读取新设置的用户环境变量。换模型、换画质不走这条路径，对话里说就行。
+
+### 切换模型和画质要不要重启？
+
+不要。只有第一次配置 `CODEX_API_URL` / `CODEX_API_KEY` 才需要重启。之后在对话里说「用 2.5」「画质 4K」即可，Skill 会给这一次请求加上 `--model` 和 `--size`。
 
 ### 接口返回 524 或超时
 

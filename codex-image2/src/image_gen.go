@@ -103,8 +103,26 @@ func resolveSize(size string) (string, error) {
 	return fmt.Sprintf("%dx%d", w, h), nil
 }
 
+// resolveModel 把对话里的叫法收成网关模型名。认不出的原样传，方便中转站自定义 id。
+func resolveModel(model string) string {
+	model = strings.TrimSpace(model)
+	if model == "" {
+		return defaultModel
+	}
+	key := strings.ToLower(strings.NewReplacer("-", " ", "_", " ").Replace(model))
+	key = strings.Join(strings.Fields(key), " ")
+	switch key {
+	case "gpt image 2", "gptimage 2", "gptimage2", "image 2", "image2":
+		return "gpt-image-2"
+	case "gpt image 2.5", "gptimage 2.5", "gptimage2.5", "image 2.5", "image2.5", "2.5":
+		return "gpt-image-2.5"
+	default:
+		return model
+	}
+}
+
 func validateCommon(args commonArgs) error {
-	if strings.TrimSpace(args.model) == "" {
+	if strings.TrimSpace(resolveModel(args.model)) == "" {
 		return errors.New("model must not be empty")
 	}
 	if args.n < 1 || args.n > 10 {
@@ -285,11 +303,12 @@ func generate(prompt, out string, args commonArgs) (map[string]any, error) {
 		return nil, err
 	}
 	ep := endpoint(os.Getenv("CODEX_API_URL"), "generations")
+	model := resolveModel(args.model)
 	resolvedSize, err := resolveSize(args.size)
 	if err != nil {
 		return nil, err
 	}
-	payload := map[string]any{"model": args.model, "prompt": prompt, "size": resolvedSize, "quality": args.quality, "n": args.n}
+	payload := map[string]any{"model": model, "prompt": prompt, "size": resolvedSize, "quality": args.quality, "n": args.n}
 	if args.dryRun {
 		return map[string]any{"dry_run": true, "endpoint": ep, "payload": payload, "outputs": paths}, nil
 	}
@@ -318,7 +337,7 @@ func generate(prompt, out string, args commonArgs) (map[string]any, error) {
 	if err != nil {
 		return nil, err
 	}
-	return map[string]any{"model": args.model, "size": args.size, "resolved_size": resolvedSize, "quality": args.quality, "outputs": outputs}, nil
+	return map[string]any{"model": model, "size": args.size, "resolved_size": resolvedSize, "quality": args.quality, "outputs": outputs}, nil
 }
 
 func edit(prompt string, imagePaths []string, mask, out string, args commonArgs) (map[string]any, error) {
@@ -338,11 +357,12 @@ func edit(prompt string, imagePaths []string, mask, out string, args commonArgs)
 		return nil, err
 	}
 	ep := endpoint(os.Getenv("CODEX_API_URL"), "edits")
+	model := resolveModel(args.model)
 	resolvedSize, err := resolveSize(args.size)
 	if err != nil {
 		return nil, err
 	}
-	fields := map[string]string{"model": args.model, "prompt": prompt, "size": resolvedSize, "quality": args.quality, "n": strconv.Itoa(args.n)}
+	fields := map[string]string{"model": model, "prompt": prompt, "size": resolvedSize, "quality": args.quality, "n": strconv.Itoa(args.n)}
 	if args.dryRun {
 		return map[string]any{"dry_run": true, "endpoint": ep, "fields": fields, "images": imagePaths, "mask": mask, "outputs": paths}, nil
 	}
@@ -408,7 +428,7 @@ func edit(prompt string, imagePaths []string, mask, out string, args commonArgs)
 	if err != nil {
 		return nil, err
 	}
-	return map[string]any{"model": args.model, "size": args.size, "resolved_size": resolvedSize, "quality": args.quality, "outputs": outputs}, nil
+	return map[string]any{"model": model, "size": args.size, "resolved_size": resolvedSize, "quality": args.quality, "outputs": outputs}, nil
 }
 
 func printJSON(value any) {

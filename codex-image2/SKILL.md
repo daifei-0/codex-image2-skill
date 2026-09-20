@@ -1,6 +1,6 @@
 ---
 name: codex-image2
-description: Generate or edit raster images through a configurable OpenAI-compatible Image API using gpt-image-2. Use when Codex should create one or many images, illustrations, product shots, covers, website assets, visual variants, background replacements, object changes, or other image edits through CODEX_API_URL and CODEX_API_KEY instead of the built-in image generation tool.
+description: Generate or edit raster images through a configurable OpenAI-compatible Image API. Default model is gpt-image-2 and default size is 1K. If the user names a model (gpt-image-2, gpt-image-2.5, 2.5) or 画质 1K/2K/4K in this conversation, pass --model and --size for that call. Do not ask them to edit config or restart Codex to switch model or resolution.
 ---
 
 # Codex Image2
@@ -18,20 +18,28 @@ Choose once from the current operating system and CPU architecture:
 
 On macOS, run `chmod +x <executable>` if execute permission was not preserved. Do not compile from source during normal use.
 
-## Choose model and resolution
+## Choose model and resolution from this conversation
 
-Defaults stay `gpt-image-2` and `1K`. Do not switch them unless the user asks.
+The user switches model and 画质 in chat. Never tell them to edit SKILL.md, `.env`, environment variables, or restart Codex for this. API URL/key restart is unrelated.
 
-When the user names a model, pass `--model` with that exact id. Common ids:
+Defaults stay `gpt-image-2` and `1K` when this turn (and this thread) has not chosen otherwise. Do not silently upgrade to 2.5.
 
-- `gpt-image-2` (default)
-- `gpt-image-2.5`
-- `gpt-image-2.5-flare`
-- `gpt-image-2.5-sunburst`
+Read the user's wording this turn:
 
-`--model` is a free string. If the user's gateway uses another id, pass that id.
+| User says | Pass |
+| --- | --- |
+| 不提模型 | `--model gpt-image-2` |
+| 2.5 / GPT Image 2.5 / gpt-image-2.5 | `--model gpt-image-2.5` |
+| GPT Image 2 / gpt-image-2 | `--model gpt-image-2` |
+| 画质 1K / 1K | `--size 1K` |
+| 画质 2K / 2K | `--size 2K` |
+| 画质 4K / 4K | `--size 4K` |
 
-When the user names 画质 / resolution as 1K, 2K, or 4K, pass `--size` with that alias. Mapping sent to the API:
+If this thread already chose a model or size and the new message does not change it, keep using that choice. If they name a different model or 画质, switch immediately for this call.
+
+`--model` is a free string. If the user's gateway uses another id (`gpt-image-2.5-flare`, `gpt-image-2.5-sunburst`, or a custom name), pass that id.
+
+Mapping sent to the API:
 
 | `--size` | API pixels |
 | --- | --- |
@@ -45,7 +53,7 @@ When the user names 画质 / resolution as 1K, 2K, or 4K, pass `--size` with tha
 
 1. Decide whether the request is a new image, an edit, or multiple distinct assets/variants.
 2. Collect the prompt, intended use, exact text, visual constraints, and avoid items.
-3. If the user chose a model or 1K/2K/4K, record `--model` and `--size`. Otherwise keep the defaults.
+3. From this conversation, set `--model` and `--size`. Do not send the user to a config file.
 4. Shape the prompt only as much as needed. Preserve detailed prompts; tastefully clarify generic prompts without inventing brands, people, slogans, or unrelated objects.
 5. Run the selected executable with `generate` for one prompt, `edit` for changes to existing images, or `generate-batch` for JSONL jobs.
 6. Inspect each output for subject, composition, text accuracy, constraints, and visible artifacts.
@@ -130,7 +138,7 @@ Read [references/batch-format.md](references/batch-format.md) before preparing a
 - Read the API base from `CODEX_API_URL`; default to `https://apinebula.com`.
 - Require `CODEX_API_KEY`. Never place it in a command, file, prompt, log, or response.
 - If the key is absent, tell the user to set it locally and confirm when ready. Never ask them to paste it into chat.
-- Default to model `gpt-image-2` and size `1K`. Pass `--model` and `--size 1K|2K|4K` only when the user chooses them. Do not silently upgrade the model to 2.5.
+- Default to model `gpt-image-2` and size `1K`. Switch with `--model` / `--size 1K|2K|4K` from the user's chat this turn. Never ask them to restart Codex or edit text config to change model or 画质.
 - `--quality` defaults to `auto` (`low`, `medium`, `high`, or `auto`).
 - Use `--dry-run` to validate a request without network access or requiring a key.
 - Save project-bound assets inside the current project. The CLI default is `output/imagegen/`.
