@@ -18,15 +18,39 @@ Choose once from the current operating system and CPU architecture:
 
 On macOS, run `chmod +x <executable>` if execute permission was not preserved. Do not compile from source during normal use.
 
+## Choose model and resolution
+
+Defaults stay `gpt-image-2` and `1K`. Do not switch them unless the user asks.
+
+When the user names a model, pass `--model` with that exact id. Common ids:
+
+- `gpt-image-2` (default)
+- `gpt-image-2.5`
+- `gpt-image-2.5-flare`
+- `gpt-image-2.5-sunburst`
+
+`--model` is a free string. If the user's gateway uses another id, pass that id.
+
+When the user names 画质 / resolution as 1K, 2K, or 4K, pass `--size` with that alias. Mapping sent to the API:
+
+| `--size` | API pixels |
+| --- | --- |
+| `1K` (default) | `1024x1024` |
+| `2K` | `2048x2048` |
+| `4K` | `3840x2160` |
+
+`--size auto` and `--size WIDTHxHEIGHT` still work. `--quality` is separate (`low`, `medium`, `high`, `auto`) and is not 1K/2K/4K.
+
 ## Workflow
 
 1. Decide whether the request is a new image, an edit, or multiple distinct assets/variants.
 2. Collect the prompt, intended use, exact text, visual constraints, and avoid items.
-3. Shape the prompt only as much as needed. Preserve detailed prompts; tastefully clarify generic prompts without inventing brands, people, slogans, or unrelated objects.
-4. Run the selected executable with `generate` for one prompt, `edit` for changes to existing images, or `generate-batch` for JSONL jobs.
-5. Inspect each output for subject, composition, text accuracy, constraints, and visible artifacts.
-6. If revision is needed, change one targeted aspect per iteration and re-check.
-7. Report absolute output paths, the final prompt or prompt set, size, quality, and model.
+3. If the user chose a model or 1K/2K/4K, record `--model` and `--size`. Otherwise keep the defaults.
+4. Shape the prompt only as much as needed. Preserve detailed prompts; tastefully clarify generic prompts without inventing brands, people, slogans, or unrelated objects.
+5. Run the selected executable with `generate` for one prompt, `edit` for changes to existing images, or `generate-batch` for JSONL jobs.
+6. Inspect each output for subject, composition, text accuracy, constraints, and visible artifacts.
+7. If revision is needed, change one targeted aspect per iteration and re-check.
+8. Report absolute output paths, the final prompt or prompt set, requested size, resolved pixels, quality, and model.
 
 ## Prompt structure
 
@@ -50,12 +74,26 @@ Do not add detail merely to fill the schema. For text in images, quote it verbat
 
 ## Generate one image
 
+Default call (GPT Image 2, 1K):
+
 ```powershell
 & "<skill-dir>\bin\codex-image2-windows-amd64.exe" generate `
   --prompt "A small blue nebula in a glass bottle, studio product photo" `
-  --size 1024x1024 `
+  --model gpt-image-2 `
+  --size 1K `
   --quality auto `
   --out "output/imagegen/nebula.png"
+```
+
+When the user chooses another model or resolution, change those two flags only:
+
+```powershell
+& "<skill-dir>\bin\codex-image2-windows-amd64.exe" generate `
+  --prompt "A small blue nebula in a glass bottle, studio product photo" `
+  --model gpt-image-2.5 `
+  --size 4K `
+  --quality auto `
+  --out "output/imagegen/nebula-4k.png"
 ```
 
 Use `--prompt-file` for long prompts. Use `--n` only for variants of the same prompt. Distinct assets belong in separate calls or a batch.
@@ -68,6 +106,8 @@ Inspect each input image before editing. State its role and repeat invariants in
 & "<skill-dir>\bin\codex-image2-windows-amd64.exe" edit `
   --image "input/product.png" `
   --prompt "Replace only the background with a warm studio backdrop. Keep the product, label, proportions, and edges unchanged." `
+  --model gpt-image-2 `
+  --size 1K `
   --quality auto `
   --out "output/imagegen/product-edited.png"
 ```
@@ -90,7 +130,8 @@ Read [references/batch-format.md](references/batch-format.md) before preparing a
 - Read the API base from `CODEX_API_URL`; default to `https://apinebula.com`.
 - Require `CODEX_API_KEY`. Never place it in a command, file, prompt, log, or response.
 - If the key is absent, tell the user to set it locally and confirm when ready. Never ask them to paste it into chat.
-- Default to model `gpt-image-2`, size `1024x1024`, and quality `auto`.
+- Default to model `gpt-image-2` and size `1K`. Pass `--model` and `--size 1K|2K|4K` only when the user chooses them. Do not silently upgrade the model to 2.5.
+- `--quality` defaults to `auto` (`low`, `medium`, `high`, or `auto`).
 - Use `--dry-run` to validate a request without network access or requiring a key.
 - Save project-bound assets inside the current project. The CLI default is `output/imagegen/`.
 - Do not overwrite files unless the user explicitly authorizes it and `--force` is passed.
@@ -99,6 +140,6 @@ Read [references/batch-format.md](references/batch-format.md) before preparing a
 ## Failure handling
 
 - The CLI retries network timeouts and HTTP 429/500/502/503/504/524 failures with bounded backoff.
-- On repeated timeout, suggest `--quality low`, a square size, fewer concurrent jobs, or a later retry.
+- On repeated timeout, suggest `--quality low`, `--size 1K`, fewer concurrent jobs, or a later retry.
 - Do not retry authentication, validation, or other ordinary 4xx errors.
 - Never expose an Authorization header or full key when reporting errors.

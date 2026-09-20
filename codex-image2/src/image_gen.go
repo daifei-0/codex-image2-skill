@@ -25,10 +25,18 @@ import (
 const (
 	defaultAPIURL  = "https://apinebula.com"
 	defaultModel   = "gpt-image-2"
-	defaultSize    = "1024x1024"
+	defaultSize    = "1K"
 	defaultQuality = "auto"
 	defaultOutDir  = "output/imagegen"
 )
+
+// sizePresets 把用户说的 1K/2K/4K 换成 Images API 真正认的像素。
+// 4K 用 3840x2160：官方长边上限 3840，正方形 3840x3840 会超过像素总量上限。
+var sizePresets = map[string]string{
+	"1K": "1024x1024",
+	"2K": "2048x2048",
+	"4K": "3840x2160",
+}
 
 var retryable = map[int]bool{429: true, 500: true, 502: true, 503: true, 504: true, 524: true}
 
@@ -71,7 +79,34 @@ func endpoint(base, operation string) string {
 	return base + "/images/" + operation
 }
 
+// resolveSize 接受 1K/2K/4K、auto，或 WIDTHxHEIGHT。发给上游的永远是后两种。
+func resolveSize(size string) (string, error) {
+	size = strings.TrimSpace(size)
+	if size == "" {
+		size = defaultSize
+	}
+	if preset, ok := sizePresets[strings.ToUpper(size)]; ok {
+		return preset, nil
+	}
+	if strings.EqualFold(size, "auto") {
+		return "auto", nil
+	}
+	parts := strings.Split(strings.ToLower(size), "x")
+	if len(parts) != 2 {
+		return "", errors.New("size must be 1K, 2K, 4K, auto, or WIDTHxHEIGHT")
+	}
+	w, e1 := strconv.Atoi(parts[0])
+	h, e2 := strconv.Atoi(parts[1])
+	if e1 != nil || e2 != nil || w < 1 || h < 1 {
+		return "", errors.New("size must be 1K, 2K, 4K, auto, or WIDTHxHEIGHT")
+	}
+	return fmt.Sprintf("%dx%d", w, h), nil
+}
+
 func validateCommon(args commonArgs) error {
+	if strings.TrimSpace(args.model) == "" {
+		return errors.New("model must not be empty")
+	}
 	if args.n < 1 || args.n > 10 {
 		return errors.New("n must be from 1 to 10")
 	}
@@ -84,16 +119,8 @@ func validateCommon(args commonArgs) error {
 	if args.quality != "low" && args.quality != "medium" && args.quality != "high" && args.quality != "auto" {
 		return errors.New("quality must be low, medium, high, or auto")
 	}
-	if args.size != "auto" {
-		parts := strings.Split(args.size, "x")
-		if len(parts) != 2 {
-			return errors.New("size must be 'auto' or WIDTHxHEIGHT")
-		}
-		w, e1 := strconv.Atoi(parts[0])
-		h, e2 := strconv.Atoi(parts[1])
-		if e1 != nil || e2 != nil || w < 1 || h < 1 {
-			return errors.New("size must be 'auto' or WIDTHxHEIGHT")
-		}
+	if _, err := resolveSize(args.size); err != nil {
+		return err
 	}
 	return nil
 }
@@ -258,7 +285,11 @@ func generate(prompt, out string, args commonArgs) (map[string]any, error) {
 		return nil, err
 	}
 	ep := endpoint(os.Getenv("CODEX_API_URL"), "generations")
-	payload := map[string]any{"model": args.model, "prompt": prompt, "size": args.size, "quality": args.quality, "n": args.n}
+	resolvedSize, err := resolveSize(args.size)
+	if err != nil {
+		return nil, err
+	}
+	payload := map[string]any{"model": args.model, "prompt": prompt, "size": resolvedSize, "quality": args.quality, "n": args.n}
 	if args.dryRun {
 		return map[string]any{"dry_run": true, "endpoint": ep, "payload": payload, "outputs": paths}, nil
 	}
@@ -287,7 +318,7 @@ func generate(prompt, out string, args commonArgs) (map[string]any, error) {
 	if err != nil {
 		return nil, err
 	}
-	return map[string]any{"model": args.model, "size": args.size, "quality": args.quality, "outputs": outputs}, nil
+	return map[string]any{"model": args.model, "size": args.size, "resolved_size": resolvedSize, "quality": args.quality, "outputs": outputs}, nil
 }
 
 func edit(prompt string, imagePaths []string, mask, out string, args commonArgs) (map[string]any, error) {
@@ -307,7 +338,11 @@ func edit(prompt string, imagePaths []string, mask, out string, args commonArgs)
 		return nil, err
 	}
 	ep := endpoint(os.Getenv("CODEX_API_URL"), "edits")
-	fields := map[string]string{"model": args.model, "prompt": prompt, "size": args.size, "quality": args.quality, "n": strconv.Itoa(args.n)}
+	resolvedSize, err := resolveSize(args.size)
+	if err != nil {
+		return nil, err
+	}
+	fields := map[string]string{"model": args.model, "prompt": prompt, "size": resolvedSize, "quality": args.quality, "n": strconv.Itoa(args.n)}
 	if args.dryRun {
 		return map[string]any{"dry_run": true, "endpoint": ep, "fields": fields, "images": imagePaths, "mask": mask, "outputs": paths}, nil
 	}
@@ -373,7 +408,7 @@ func edit(prompt string, imagePaths []string, mask, out string, args commonArgs)
 	if err != nil {
 		return nil, err
 	}
-	return map[string]any{"model": args.model, "size": args.size, "quality": args.quality, "outputs": outputs}, nil
+	return map[string]any{"model": args.model, "size": args.size, "resolved_size": resolvedSize, "quality": args.quality, "outputs": outputs}, nil
 }
 
 func printJSON(value any) {
@@ -385,8 +420,8 @@ func printJSON(value any) {
 
 func parseCommon(fs *flag.FlagSet, argv []string, args *commonArgs) error {
 	var timeout float64
-	fs.StringVar(&args.model, "model", defaultModel, "image model")
-	fs.StringVar(&args.size, "size", defaultSize, "auto or WIDTHxHEIGHT")
+	fs.StringVar(&args.model, "model", defaultModel, "image model (default gpt-image-2; pass gpt-image-2.5 or another id to switch)")
+	fs.StringVar(&args.size, "size", defaultSize, "1K, 2K, 4K, auto, or WIDTHxHEIGHT")
 	fs.StringVar(&args.quality, "quality", defaultQuality, "low, medium, high, or auto")
 	fs.IntVar(&args.n, "n", 1, "number of variants (1-10)")
 	fs.StringVar(&args.outDir, "out-dir", defaultOutDir, "default output directory")
@@ -564,6 +599,8 @@ func runBatch(argv []string) error {
 
 func usage() {
 	fmt.Fprintln(os.Stderr, "Usage: codex-image2 <generate|generate-batch|edit> [options]")
+	fmt.Fprintln(os.Stderr, "Defaults: --model gpt-image-2  --size 1K  --quality auto")
+	fmt.Fprintln(os.Stderr, "Size aliases: 1K=1024x1024  2K=2048x2048  4K=3840x2160")
 }
 
 func main() {

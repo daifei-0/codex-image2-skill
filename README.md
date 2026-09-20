@@ -1,6 +1,6 @@
 # Codex Image2 Skill（鹊桥转存）
 
-让 Codex 通过自定义 API 地址和密钥，直接调用 `gpt-image-2` 生成或编辑图片。
+让 Codex 通过自定义 API 地址和密钥生成或编辑图片。默认模型是 `gpt-image-2`，默认画质是 `1K`；调用时也可以改成其他模型（例如 `gpt-image-2.5`）以及 `2K` / `4K`。
 
 ## 关于本仓库
 
@@ -30,8 +30,10 @@
 
 - 文生图
 - 单图或多图编辑
+- 可选生图模型：默认 `gpt-image-2`，用 `--model` 换成 `gpt-image-2.5` 或其他网关模型名
+- 可选画质：默认 `1K`，用 `--size 1K|2K|4K` 切换（也仍支持 `auto` 和 `WIDTHxHEIGHT`）
 - 可选 PNG Mask 局部编辑
-- JSONL 并发批量生图
+- JSONL 并发批量生图，单条任务可覆盖 `model` / `size`
 - 支持 Base64 和 URL 两种图片响应
 - 自动重试网络超时、429、5xx 和 524 错误
 - 输出文件覆盖保护
@@ -107,6 +109,13 @@ export CODEX_API_KEY="你的API密钥"
 一只戴着宇航员头盔的橘猫站在月球表面，远处可以看到地球，电影感灯光。
 ```
 
+不指定时走默认：模型 `gpt-image-2`，画质 `1K`。需要换成 2.5 或更高分辨率时直接说出来即可，例如：
+
+```text
+使用 $codex-image2，模型用 gpt-image-2.5，画质 4K：
+一只戴着宇航员头盔的橘猫站在月球表面，远处可以看到地球，电影感灯光。
+```
+
 ![使用 Codex Image2 生图](http://image.fengfengzhidao.com/fengfeng_110920260715224141.png?key=fengfengbuzhidao)
 
 改图示例：
@@ -140,9 +149,24 @@ chmod +x codex-image2/bin/codex-image2-darwin-*
 ```powershell
 & "codex-image2/bin/codex-image2-windows-amd64.exe" generate `
   --prompt "A tiny blue nebula inside a glass bottle" `
+  --model gpt-image-2 `
+  --size 1K `
   --quality auto `
   --out "output/imagegen/nebula.png"
 ```
+
+换成 2.5 和 4K：
+
+```powershell
+& "codex-image2/bin/codex-image2-windows-amd64.exe" generate `
+  --prompt "A tiny blue nebula inside a glass bottle" `
+  --model gpt-image-2.5 `
+  --size 4K `
+  --quality auto `
+  --out "output/imagegen/nebula-4k.png"
+```
+
+`--size` 对照：`1K` → `1024x1024`，`2K` → `2048x2048`，`4K` → `3840x2160`。`--quality` 仍是 `low|medium|high|auto`，和画质档位不是一回事。
 
 编辑图片：
 
@@ -188,11 +212,11 @@ go build -trimpath -ldflags "-s -w" -o codex-image2/bin/codex-image2-windows-amd
 
 ### 接口返回 524 或超时
 
-这通常表示中转服务的图片生成耗时超过了网关限制。可以尝试降低质量、使用 `1024x1024`、减少批量并发，或稍后重试。
+这通常表示中转服务的图片生成耗时超过了网关限制。可以尝试 `--quality low`、`--size 1K`、减少批量并发，或稍后重试。
 
 ### 是否支持所有中转站
 
-中转服务需要兼容以下接口，并提供 `gpt-image-2` 模型：
+中转服务需要兼容以下接口，并提供你实际传入的模型（默认 `gpt-image-2`，也可传 `gpt-image-2.5` 等）：
 
 ```text
 POST /v1/images/generations
