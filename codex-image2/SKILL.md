@@ -1,6 +1,6 @@
 ---
 name: codex-image2
-description: Generate or edit raster images through a configurable OpenAI-compatible Image API. Default model is gpt-image-2 and default size is 1K. If the user names a model (gpt-image-2, gpt-image-2.5, 2.5) or 画质 1K/2K/4K in this conversation, pass --model and --size for that call. Do not ask them to edit config or restart Codex to switch model or resolution.
+description: Generate or edit raster images through a configurable OpenAI-compatible Image API. Default is gpt-image-2 and 1K. In conversation the user may pick GPT image models (gpt-image-2, gpt-image-2.5, gpt-image-2.5-flare, gpt-image-2.5-sunburst) or Grok image models (grok-imagine, grok-imagine-image-2.0, grok-imagine-image-quality) and 画质 1K/2K/4K. Do not use grok-imagine-video. Do not ask them to edit config or restart Codex to switch.
 ---
 
 # Codex Image2
@@ -22,32 +22,38 @@ On macOS, run `chmod +x <executable>` if execute permission was not preserved. D
 
 The user switches model and 画质 in chat. Never tell them to edit SKILL.md, `.env`, environment variables, or restart Codex for this. API URL/key restart is unrelated.
 
-Defaults stay `gpt-image-2` and `1K` when this turn (and this thread) has not chosen otherwise. Do not silently upgrade to 2.5.
+Defaults stay `gpt-image-2` and `1K` when this turn (and this thread) has not chosen otherwise. Do not silently upgrade the model.
 
-Read the user's wording this turn:
+This skill covers **image** models only. If the user asks for `grok-imagine-video` or `grok-imagine-video-1.5`, refuse and say video is not supported here.
+
+### GPT image
 
 | User says | Pass |
 | --- | --- |
-| 不提模型 | `--model gpt-image-2` |
+| 不提模型 / GPT / GPT Image 2 | `--model gpt-image-2` |
 | 2.5 / GPT Image 2.5 / gpt-image-2.5 | `--model gpt-image-2.5` |
-| GPT Image 2 / gpt-image-2 | `--model gpt-image-2` |
-| 画质 1K / 1K | `--size 1K` |
-| 画质 2K / 2K | `--size 2K` |
-| 画质 4K / 4K | `--size 4K` |
+| 闪焰 / flare / gpt-image-2.5-flare | `--model gpt-image-2.5-flare` |
+| 日耀 / sunburst / gpt-image-2.5-sunburst | `--model gpt-image-2.5-sunburst` |
+
+GPT 画质 `--size`: `1K` → `1024x1024`，`2K` → `2048x2048`，`4K` → `3840x2160`.
+
+### Grok image
+
+Bare 「Grok」 means `grok-imagine-image-2.0`, not video.
+
+| User says | Pass |
+| --- | --- |
+| Grok / grok 2.0 / grok-imagine-image-2.0 | `--model grok-imagine-image-2.0` |
+| Grok 高质量 / grok-imagine-image-quality | `--model grok-imagine-image-quality` |
+| grok-imagine / Grok Imagine（点名这个 id） | `--model grok-imagine` |
+
+Grok 画质 still uses `--size 1K|2K|4K`. The CLI sends Grok `resolution` `1k`/`2k`. **Grok has no 4K**; if the user asks 4K, still pass `--size 4K` and the CLI clamps to 2K. Do not invent a 4K pixel size for Grok.
 
 If this thread already chose a model or size and the new message does not change it, keep using that choice. If they name a different model or 画质, switch immediately for this call.
 
-`--model` is a free string. If the user's gateway uses another id (`gpt-image-2.5-flare`, `gpt-image-2.5-sunburst`, or a custom name), pass that id.
+`--model` is a free string for unknown gateway ids, except video ids which the CLI rejects.
 
-Mapping sent to the API:
-
-| `--size` | API pixels |
-| --- | --- |
-| `1K` (default) | `1024x1024` |
-| `2K` | `2048x2048` |
-| `4K` | `3840x2160` |
-
-`--size auto` and `--size WIDTHxHEIGHT` still work. `--quality` is separate (`low`, `medium`, `high`, `auto`) and is not 1K/2K/4K.
+`--quality` (`low`, `medium`, `high`, `auto`) is not 1K/2K/4K. For Grok, only `grok-imagine-image-2.0` uses `--quality`; `high` is sent as `auto`.
 
 ## Workflow
 
@@ -93,15 +99,14 @@ Default call (GPT Image 2, 1K):
   --out "output/imagegen/nebula.png"
 ```
 
-When the user chooses another model or resolution, change those two flags only:
+When the user chooses Grok:
 
 ```powershell
 & "<skill-dir>\bin\codex-image2-windows-amd64.exe" generate `
   --prompt "A small blue nebula in a glass bottle, studio product photo" `
-  --model gpt-image-2.5 `
-  --size 4K `
-  --quality auto `
-  --out "output/imagegen/nebula-4k.png"
+  --model grok-imagine-image-2.0 `
+  --size 2K `
+  --out "output/imagegen/nebula-grok.png"
 ```
 
 Use `--prompt-file` for long prompts. Use `--n` only for variants of the same prompt. Distinct assets belong in separate calls or a batch.

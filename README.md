@@ -1,6 +1,6 @@
 # Codex Image2 Skill（鹊桥转存）
 
-让 Codex 通过自定义 API 地址和密钥生成或编辑图片。默认模型是 GPT Image 2（`gpt-image-2`），默认画质是 `1K`。换模型、换画质请在对话里直接说，例如「用 2.5」「画质 4K」，不要改配置文件，也不用重启客户端。
+让 Codex 通过自定义 API 地址和密钥生成或编辑图片。默认模型是 GPT Image 2（`gpt-image-2`），默认画质是 `1K`。对话里可以换成 GPT 或 Grok 的生图模型，以及 `1K` / `2K` / `4K`。**不含 Video。** 不要改配置文件，也不用重启客户端。
 
 ## 关于本仓库
 
@@ -30,8 +30,11 @@
 
 - 文生图
 - 单图或多图编辑
-- **对话里切换生图模型**：不说就用 `gpt-image-2`；说「用 2.5」就换成 `gpt-image-2.5`
-- **对话里切换画质**：不说就用 `1K`；说「画质 2K / 4K」就换分辨率。不用改配置文件，也不用重启 Codex
+- **对话里切换生图模型（不含 Video）**
+  - GPT：`gpt-image-2`（默认）、`gpt-image-2.5`、`gpt-image-2.5-flare`、`gpt-image-2.5-sunburst`
+  - Grok：`grok-imagine`、`grok-imagine-image-2.0`（说「Grok」时默认这个）、`grok-imagine-image-quality`
+- **对话里切换画质**：不说就用 `1K`。GPT 支持 `1K` / `2K` / `4K`；Grok 只支持 `1K` / `2K`（说 4K 会落到 2K）
+- 不用改配置文件，也不用重启 Codex
 - 可选 PNG Mask 局部编辑
 - JSONL 并发批量生图，单条任务可覆盖 `model` / `size`
 - 支持 Base64 和 URL 两种图片响应
@@ -109,13 +112,33 @@ export CODEX_API_KEY="你的API密钥"
 - 模型：`gpt-image-2`（GPT Image 2）
 - 画质：`1K`
 
+可选生图模型如下，**不含** `grok-imagine-video` / `grok-imagine-video-1.5`。
+
+**GPT**
+
 | 你在对话里说 | 这一次实际用 |
 | --- | --- |
-| 不提模型和画质 | `gpt-image-2` + `1K` |
-| 用 2.5 / GPT Image 2.5 / `gpt-image-2.5` | `gpt-image-2.5` + 默认 `1K` |
-| 画质 2K | 当前模型 + `2K` |
-| 画质 4K | 当前模型 + `4K` |
-| 模型 2.5，画质 4K | `gpt-image-2.5` + `4K` |
+| 不提 / GPT / GPT Image 2 | `gpt-image-2` |
+| 2.5 / GPT Image 2.5 | `gpt-image-2.5` |
+| 闪焰 / flare | `gpt-image-2.5-flare` |
+| 日耀 / sunburst | `gpt-image-2.5-sunburst` |
+
+**Grok**
+
+| 你在对话里说 | 这一次实际用 |
+| --- | --- |
+| Grok（只说 Grok） | `grok-imagine-image-2.0` |
+| Grok 2.0 / grok-imagine-image-2.0 | `grok-imagine-image-2.0` |
+| Grok 高质量 / grok-imagine-image-quality | `grok-imagine-image-quality` |
+| grok-imagine（点名这个 id） | `grok-imagine` |
+
+画质单独说：
+
+| 你在对话里说 | GPT | Grok |
+| --- | --- | --- |
+| 不提画质 | `1K`（1024×1024） | `1k` |
+| 画质 2K | `2048×2048` | `2k` |
+| 画质 4K | `3840×2160` | 没有 4K，落到 `2k` |
 
 同一段对话里下一句换说法就行，立即生效，不用重开客户端。
 
@@ -133,7 +156,28 @@ export CODEX_API_KEY="你的API密钥"
 一只戴着宇航员头盔的橘猫站在月球表面，远处可以看到地球，电影感灯光。
 ```
 
-换成 4K 画质：
+换成 GPT 闪焰 / 日耀：
+
+```text
+使用 $codex-image2，用闪焰，画质 2K：
+一只戴着宇航员头盔的橘猫站在月球表面，远处可以看到地球，电影感灯光。
+```
+
+换成 Grok：
+
+```text
+使用 $codex-image2，用 Grok，画质 2K：
+一只戴着宇航员头盔的橘猫站在月球表面，远处可以看到地球，电影感灯光。
+```
+
+Grok 高质量档：
+
+```text
+使用 $codex-image2，用 Grok 高质量：
+一只戴着宇航员头盔的橘猫站在月球表面，远处可以看到地球，电影感灯光。
+```
+
+换成 4K 画质（GPT 才是真 4K；Grok 会落到 2K）：
 
 ```text
 使用 $codex-image2，画质 4K，生成一张图片：
@@ -150,17 +194,15 @@ export CODEX_API_KEY="你的API密钥"
 同一轮对话里接着换：
 
 ```text
-还是这只猫，改用 2.5，画质 2K 再出一张。
+还是这只猫，改用 Grok，画质 2K 再出一张。
 ```
 
 改图也可以带上模型和画质：
 
 ```text
-使用 $codex-image2，画质 2K，修改这张图片：
+使用 $codex-image2，用 Grok，画质 2K，修改这张图片：
 只把背景替换成雪山，人物、服装、姿势和构图保持不变。
 ```
-
-画质对照：`1K` → `1024x1024`，`2K` → `2048x2048`，`4K` → `3840x2160`。
 
 ![使用 Codex Image2 生图](http://image.fengfengzhidao.com/fengfeng_110920260715224141.png?key=fengfengbuzhidao)
 
@@ -207,7 +249,17 @@ chmod +x codex-image2/bin/codex-image2-darwin-*
   --out "output/imagegen/nebula-4k.png"
 ```
 
-`--size` 对照：`1K` → `1024x1024`，`2K` → `2048x2048`，`4K` → `3840x2160`。`--quality` 仍是 `low|medium|high|auto`，和画质档位不是一回事。
+换成 Grok 2K：
+
+```powershell
+& "codex-image2/bin/codex-image2-windows-amd64.exe" generate `
+  --prompt "A tiny blue nebula inside a glass bottle" `
+  --model grok-imagine-image-2.0 `
+  --size 2K `
+  --out "output/imagegen/nebula-grok.png"
+```
+
+GPT 的 `--size` 对照：`1K` → `1024x1024`，`2K` → `2048x2048`，`4K` → `3840x2160`。Grok 把 `1K`/`2K` 收成 `resolution=1k|2k`，没有 4K。`--quality` 仍是 `low|medium|high|auto`，和画质档位不是一回事。
 
 编辑图片：
 
@@ -253,7 +305,15 @@ go build -trimpath -ldflags "-s -w" -o codex-image2/bin/codex-image2-windows-amd
 
 ### 切换模型和画质要不要重启？
 
-不要。只有第一次配置 `CODEX_API_URL` / `CODEX_API_KEY` 才需要重启。之后在对话里说「用 2.5」「画质 4K」即可，Skill 会给这一次请求加上 `--model` 和 `--size`。
+不要。只有第一次配置 `CODEX_API_URL` / `CODEX_API_KEY` 才需要重启。之后在对话里说「用 2.5」「用 Grok」「用闪焰」「画质 4K」即可。
+
+### 支持哪些模型？Video 呢？
+
+支持截图里的生图模型：GPT 四个（`gpt-image-2`、`gpt-image-2.5`、`gpt-image-2.5-flare`、`gpt-image-2.5-sunburst`）和 Grok 三个（`grok-imagine`、`grok-imagine-image-2.0`、`grok-imagine-image-quality`）。**不支持** `grok-imagine-video` 和 `grok-imagine-video-1.5`。
+
+### Grok 能开 4K 吗？
+
+不能。Grok Imagine 只有 `1k` 和 `2k`。对话里说 4K 时，Skill 会按 2K 发出去。
 
 ### 接口返回 524 或超时
 
@@ -261,7 +321,7 @@ go build -trimpath -ldflags "-s -w" -o codex-image2/bin/codex-image2-windows-amd
 
 ### 是否支持所有中转站
 
-中转服务需要兼容以下接口，并提供你实际传入的模型（默认 `gpt-image-2`，也可传 `gpt-image-2.5` 等）：
+中转服务需要兼容以下接口，并提供你实际传入的生图模型（默认 `gpt-image-2`，也可传 GPT 2.5/闪焰/日耀或 Grok Imagine 生图）：
 
 ```text
 POST /v1/images/generations

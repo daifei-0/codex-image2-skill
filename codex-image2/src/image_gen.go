@@ -23,11 +23,12 @@ import (
 )
 
 const (
-	defaultAPIURL  = "https://apinebula.com"
-	defaultModel   = "gpt-image-2"
-	defaultSize    = "1K"
-	defaultQuality = "auto"
-	defaultOutDir  = "output/imagegen"
+	defaultAPIURL    = "https://apinebula.com"
+	defaultModel     = "gpt-image-2"
+	defaultGrokModel = "grok-imagine-image-2.0"
+	defaultSize      = "1K"
+	defaultQuality   = "auto"
+	defaultOutDir    = "output/imagegen"
 )
 
 // sizePresets 把用户说的 1K/2K/4K 换成 Images API 真正认的像素。
@@ -39,6 +40,55 @@ var sizePresets = map[string]string{
 }
 
 var retryable = map[int]bool{429: true, 500: true, 502: true, 503: true, 504: true, 524: true}
+
+// 对话别名 → 网关模型 id。更具体的写在前面。不含 Video。
+var modelAliases = []struct {
+	alias string
+	id    string
+}{
+	{"gpt-image-2.5-flare", "gpt-image-2.5-flare"},
+	{"gpt image 2.5 flare", "gpt-image-2.5-flare"},
+	{"2.5 flare", "gpt-image-2.5-flare"},
+	{"flare", "gpt-image-2.5-flare"},
+	{"闪焰", "gpt-image-2.5-flare"},
+	{"闪焰版", "gpt-image-2.5-flare"},
+	{"gpt-image-2.5-sunburst", "gpt-image-2.5-sunburst"},
+	{"gpt image 2.5 sunburst", "gpt-image-2.5-sunburst"},
+	{"2.5 sunburst", "gpt-image-2.5-sunburst"},
+	{"sunburst", "gpt-image-2.5-sunburst"},
+	{"日耀", "gpt-image-2.5-sunburst"},
+	{"日耀版", "gpt-image-2.5-sunburst"},
+	{"gpt-image-2.5", "gpt-image-2.5"},
+	{"gpt image 2.5", "gpt-image-2.5"},
+	{"gptimage 2.5", "gpt-image-2.5"},
+	{"image 2.5", "gpt-image-2.5"},
+	{"image2.5", "gpt-image-2.5"},
+	{"2.5", "gpt-image-2.5"},
+	{"gpt-image-2", "gpt-image-2"},
+	{"gpt image 2", "gpt-image-2"},
+	{"gptimage 2", "gpt-image-2"},
+	{"gptimage2", "gpt-image-2"},
+	{"image 2", "gpt-image-2"},
+	{"image2", "gpt-image-2"},
+	{"gpt", "gpt-image-2"},
+	{"grok-imagine-image-quality", "grok-imagine-image-quality"},
+	{"grok imagine image quality", "grok-imagine-image-quality"},
+	{"grok imagine quality", "grok-imagine-image-quality"},
+	{"grok quality", "grok-imagine-image-quality"},
+	{"imagine quality", "grok-imagine-image-quality"},
+	{"grok 高质量", "grok-imagine-image-quality"},
+	{"高质量", "grok-imagine-image-quality"},
+	{"grok-imagine-image-2.0", "grok-imagine-image-2.0"},
+	{"grok imagine image 2.0", "grok-imagine-image-2.0"},
+	{"grok imagine 2.0", "grok-imagine-image-2.0"},
+	{"grok imagine image 2", "grok-imagine-image-2.0"},
+	{"grok 2.0", "grok-imagine-image-2.0"},
+	{"grok 2", "grok-imagine-image-2.0"},
+	{"imagine 2.0", "grok-imagine-image-2.0"},
+	{"grok-imagine", "grok-imagine"},
+	{"grok imagine", "grok-imagine"},
+	{"grok", defaultGrokModel},
+}
 
 type commonArgs struct {
 	model       string
@@ -103,27 +153,135 @@ func resolveSize(size string) (string, error) {
 	return fmt.Sprintf("%dx%d", w, h), nil
 }
 
-// resolveModel 把对话里的叫法收成网关模型名。认不出的原样传，方便中转站自定义 id。
-func resolveModel(model string) string {
+func normalizeKey(s string) string {
+	s = strings.ToLower(strings.TrimSpace(s))
+	s = strings.NewReplacer("-", " ", "_", " ").Replace(s)
+	return strings.Join(strings.Fields(s), " ")
+}
+
+func isVideoModel(model string) bool {
+	return strings.Contains(strings.ToLower(model), "video")
+}
+
+func isGrokImage(model string) bool {
+	k := strings.ToLower(strings.TrimSpace(model))
+	return strings.HasPrefix(k, "grok-imagine") && !isVideoModel(k)
+}
+
+// resolveModel 把对话里的叫法收成网关模型名。Video 直接拒绝；认不出的原样传。
+func resolveModel(model string) (string, error) {
 	model = strings.TrimSpace(model)
 	if model == "" {
-		return defaultModel
+		return defaultModel, nil
 	}
-	key := strings.ToLower(strings.NewReplacer("-", " ", "_", " ").Replace(model))
-	key = strings.Join(strings.Fields(key), " ")
-	switch key {
-	case "gpt image 2", "gptimage 2", "gptimage2", "image 2", "image2":
-		return "gpt-image-2"
-	case "gpt image 2.5", "gptimage 2.5", "gptimage2.5", "image 2.5", "image2.5", "2.5":
-		return "gpt-image-2.5"
-	default:
-		return model
+	if isVideoModel(model) {
+		return "", errors.New("video models are not supported; use a GPT or Grok image model")
 	}
+	key := normalizeKey(model)
+	for _, item := range modelAliases {
+		if key == normalizeKey(item.alias) {
+			return item.id, nil
+		}
+	}
+	return model, nil
+}
+
+func grokResolution(size string) (string, string) {
+	size = strings.TrimSpace(size)
+	if size == "" {
+		size = defaultSize
+	}
+	switch strings.ToUpper(size) {
+	case "1K", "AUTO":
+		return "1k", ""
+	case "2K":
+		return "2k", ""
+	case "4K":
+		return "2k", "Grok Imagine supports 1k and 2k only; 4K was clamped to 2k"
+	}
+	resolved, err := resolveSize(size)
+	if err != nil {
+		return "1k", ""
+	}
+	parts := strings.Split(strings.ToLower(resolved), "x")
+	if len(parts) == 2 {
+		w, e1 := strconv.Atoi(parts[0])
+		h, e2 := strconv.Atoi(parts[1])
+		if e1 == nil && e2 == nil && (w >= 1536 || h >= 1536) {
+			return "2k", ""
+		}
+	}
+	return "1k", ""
+}
+
+type imageSpec struct {
+	model   string
+	payload map[string]any
+	fields  map[string]string
+	extra   map[string]any
+}
+
+func prepareImageRequest(prompt string, args commonArgs) (imageSpec, error) {
+	model, err := resolveModel(args.model)
+	if err != nil {
+		return imageSpec{}, err
+	}
+	spec := imageSpec{
+		model:   model,
+		payload: map[string]any{"model": model, "prompt": prompt, "n": args.n},
+		fields:  map[string]string{"model": model, "prompt": prompt, "n": strconv.Itoa(args.n)},
+		extra:   map[string]any{"model": model, "size": args.size},
+	}
+	if isGrokImage(model) {
+		res, note := grokResolution(args.size)
+		spec.payload["resolution"] = res
+		spec.fields["resolution"] = res
+		spec.extra["family"] = "grok"
+		spec.extra["resolution"] = res
+		if note != "" {
+			spec.extra["note"] = note
+		}
+		if model == "grok-imagine-image-2.0" {
+			q := args.quality
+			if q == "high" {
+				q = "auto"
+			}
+			spec.payload["quality"] = q
+			spec.fields["quality"] = q
+			spec.extra["quality"] = q
+		}
+		return spec, nil
+	}
+	resolved, err := resolveSize(args.size)
+	if err != nil {
+		return imageSpec{}, err
+	}
+	spec.payload["size"] = resolved
+	spec.payload["quality"] = args.quality
+	spec.fields["size"] = resolved
+	spec.fields["quality"] = args.quality
+	spec.extra["resolved_size"] = resolved
+	spec.extra["quality"] = args.quality
+	if strings.HasPrefix(strings.ToLower(model), "gpt-image") {
+		spec.extra["family"] = "gpt"
+	} else {
+		spec.extra["family"] = "other"
+	}
+	return spec, nil
+}
+
+func resultJSON(spec imageSpec, outputs any) map[string]any {
+	out := map[string]any{}
+	for k, v := range spec.extra {
+		out[k] = v
+	}
+	out["outputs"] = outputs
+	return out
 }
 
 func validateCommon(args commonArgs) error {
-	if strings.TrimSpace(resolveModel(args.model)) == "" {
-		return errors.New("model must not be empty")
+	if _, err := resolveModel(args.model); err != nil {
+		return err
 	}
 	if args.n < 1 || args.n > 10 {
 		return errors.New("n must be from 1 to 10")
@@ -303,20 +461,18 @@ func generate(prompt, out string, args commonArgs) (map[string]any, error) {
 		return nil, err
 	}
 	ep := endpoint(os.Getenv("CODEX_API_URL"), "generations")
-	model := resolveModel(args.model)
-	resolvedSize, err := resolveSize(args.size)
+	spec, err := prepareImageRequest(prompt, args)
 	if err != nil {
 		return nil, err
 	}
-	payload := map[string]any{"model": model, "prompt": prompt, "size": resolvedSize, "quality": args.quality, "n": args.n}
 	if args.dryRun {
-		return map[string]any{"dry_run": true, "endpoint": ep, "payload": payload, "outputs": paths}, nil
+		return map[string]any{"dry_run": true, "endpoint": ep, "payload": spec.payload, "outputs": paths}, nil
 	}
 	key, err := apiKey()
 	if err != nil {
 		return nil, err
 	}
-	body, _ := json.Marshal(payload)
+	body, _ := json.Marshal(spec.payload)
 	client := &http.Client{Timeout: args.timeout}
 	raw, err := doRequest(client, func() (*http.Request, error) {
 		req, err := http.NewRequest(http.MethodPost, ep, bytes.NewReader(body))
@@ -337,7 +493,7 @@ func generate(prompt, out string, args commonArgs) (map[string]any, error) {
 	if err != nil {
 		return nil, err
 	}
-	return map[string]any{"model": model, "size": args.size, "resolved_size": resolvedSize, "quality": args.quality, "outputs": outputs}, nil
+	return resultJSON(spec, outputs), nil
 }
 
 func edit(prompt string, imagePaths []string, mask, out string, args commonArgs) (map[string]any, error) {
@@ -357,14 +513,12 @@ func edit(prompt string, imagePaths []string, mask, out string, args commonArgs)
 		return nil, err
 	}
 	ep := endpoint(os.Getenv("CODEX_API_URL"), "edits")
-	model := resolveModel(args.model)
-	resolvedSize, err := resolveSize(args.size)
+	spec, err := prepareImageRequest(prompt, args)
 	if err != nil {
 		return nil, err
 	}
-	fields := map[string]string{"model": model, "prompt": prompt, "size": resolvedSize, "quality": args.quality, "n": strconv.Itoa(args.n)}
 	if args.dryRun {
-		return map[string]any{"dry_run": true, "endpoint": ep, "fields": fields, "images": imagePaths, "mask": mask, "outputs": paths}, nil
+		return map[string]any{"dry_run": true, "endpoint": ep, "fields": spec.fields, "images": imagePaths, "mask": mask, "outputs": paths}, nil
 	}
 	key, err := apiKey()
 	if err != nil {
@@ -372,7 +526,7 @@ func edit(prompt string, imagePaths []string, mask, out string, args commonArgs)
 	}
 	var body bytes.Buffer
 	writer := multipart.NewWriter(&body)
-	for name, value := range fields {
+	for name, value := range spec.fields {
 		_ = writer.WriteField(name, value)
 	}
 	for _, path := range imagePaths {
@@ -428,7 +582,7 @@ func edit(prompt string, imagePaths []string, mask, out string, args commonArgs)
 	if err != nil {
 		return nil, err
 	}
-	return map[string]any{"model": model, "size": args.size, "resolved_size": resolvedSize, "quality": args.quality, "outputs": outputs}, nil
+	return resultJSON(spec, outputs), nil
 }
 
 func printJSON(value any) {
@@ -440,7 +594,7 @@ func printJSON(value any) {
 
 func parseCommon(fs *flag.FlagSet, argv []string, args *commonArgs) error {
 	var timeout float64
-	fs.StringVar(&args.model, "model", defaultModel, "image model (default gpt-image-2; pass gpt-image-2.5 or another id to switch)")
+	fs.StringVar(&args.model, "model", defaultModel, "image model (default gpt-image-2; GPT or Grok image ids, not video)")
 	fs.StringVar(&args.size, "size", defaultSize, "1K, 2K, 4K, auto, or WIDTHxHEIGHT")
 	fs.StringVar(&args.quality, "quality", defaultQuality, "low, medium, high, or auto")
 	fs.IntVar(&args.n, "n", 1, "number of variants (1-10)")
@@ -620,7 +774,11 @@ func runBatch(argv []string) error {
 func usage() {
 	fmt.Fprintln(os.Stderr, "Usage: codex-image2 <generate|generate-batch|edit> [options]")
 	fmt.Fprintln(os.Stderr, "Defaults: --model gpt-image-2  --size 1K  --quality auto")
-	fmt.Fprintln(os.Stderr, "Size aliases: 1K=1024x1024  2K=2048x2048  4K=3840x2160")
+	fmt.Fprintln(os.Stderr, "GPT:   gpt-image-2  gpt-image-2.5  gpt-image-2.5-flare  gpt-image-2.5-sunburst")
+	fmt.Fprintln(os.Stderr, "Grok:  grok-imagine  grok-imagine-image-2.0  grok-imagine-image-quality")
+	fmt.Fprintln(os.Stderr, "Video models are not supported.")
+	fmt.Fprintln(os.Stderr, "GPT size: 1K=1024x1024  2K=2048x2048  4K=3840x2160")
+	fmt.Fprintln(os.Stderr, "Grok resolution: 1K or 2K (4K clamps to 2K)")
 }
 
 func main() {
