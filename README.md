@@ -2,17 +2,6 @@
 
 让 Codex 通过自定义 API 地址和密钥生成或编辑图片。默认模型是 GPT Image 2（`gpt-image-2`），默认画质是 `1K`。对话里可以换成 GPT 或 Grok 的生图模型，以及 `1K` / `2K` / `4K`。**不含 Video。** 不要改配置文件，也不用重启客户端。
 
-## 关于本仓库
-
-本仓库是 **鹊桥** 对开源项目 [fengfengzhidao/codex-image2-skill](https://github.com/fengfengzhidao/codex-image2-skill) 的 **转存备份**。
-
-- 原作者：[fengfengzhidao](https://github.com/fengfengzhidao)，原仓库地址：https://github.com/fengfengzhidao/codex-image2-skill
-- 转存目的：鹊桥的用户会长期通过本地址安装这个 Skill，为避免原仓库失效、删除或不可访问导致安装失败，这里做了一份完整转存。
-- 转存内容：Skill 目录、可执行文件、源码和许可证来自原仓库；仓库名和 Skill 名（`codex-image2`）未改。本 README 补充了转存说明、安装地址，以及对话里切换生图模型和 1K/2K/4K 画质的用法。
-- 许可证：沿用原项目的 [MIT](LICENSE) 许可，版权归原作者所有。
-
-如果你需要最新版本或想参与开发，请优先访问原仓库。
-
 ## 为什么做这个 Skill
 
 最近使用 API 中转服务时，我发现不少中转站已经把 `gpt-image-2` 从常规模型列表中移出，导致 Codex 无法像以前一样直接发现并调用生图模型。
@@ -340,3 +329,14 @@ POST /v1/images/edits
 ## License
 
 [MIT](LICENSE)
+
+## 关于本仓库
+
+本仓库是 **鹊桥** 对开源项目 [fengfengzhidao/codex-image2-skill](https://github.com/fengfengzhidao/codex-image2-skill) 的 **转存备份**。
+
+- 原作者：[fengfengzhidao](https://github.com/fengfengzhidao)，原仓库地址：https://github.com/fengfengzhidao/codex-image2-skill
+- 转存目的：鹊桥的用户会长期通过本地址安装这个 Skill，为避免原仓库失效、删除或不可访问导致安装失败，这里做了一份完整转存。
+- 转存内容：Skill 目录、可执行文件、源码和许可证来自原仓库；仓库名和 Skill 名（`codex-image2`）未改。本 README 补充了转存说明、安装地址，以及对话里切换生图模型和 1K/2K/4K 画质的用法。
+- 许可证：沿用原项目的 [MIT](LICENSE) 许可，版权归原作者所有。
+
+如果你需要最新版本或想参与开发，请优先访问原仓库。
