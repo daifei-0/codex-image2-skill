@@ -27,7 +27,7 @@ import (
 
 const (
 	defaultAPIURL    = "https://apinebula.com"
-	defaultModel     = "gpt-image-2"
+	defaultModel     = "gpt-image-2.5"
 	defaultGrokModel = "grok-imagine-image-2.0"
 	defaultSize      = "1K"
 	defaultQuality   = "auto"
@@ -52,12 +52,16 @@ var modelAliases = []struct {
 	{"gpt-image-2.5-flare", "gpt-image-2.5-flare"},
 	{"gpt image 2.5 flare", "gpt-image-2.5-flare"},
 	{"2.5 flare", "gpt-image-2.5-flare"},
+	{"image 2.5 flare", "gpt-image-2.5-flare"},
+	{"image 2.5 闪焰", "gpt-image-2.5-flare"},
 	{"flare", "gpt-image-2.5-flare"},
 	{"闪焰", "gpt-image-2.5-flare"},
 	{"闪焰版", "gpt-image-2.5-flare"},
 	{"gpt-image-2.5-sunburst", "gpt-image-2.5-sunburst"},
 	{"gpt image 2.5 sunburst", "gpt-image-2.5-sunburst"},
 	{"2.5 sunburst", "gpt-image-2.5-sunburst"},
+	{"image 2.5 sunburst", "gpt-image-2.5-sunburst"},
+	{"image 2.5 日耀", "gpt-image-2.5-sunburst"},
 	{"sunburst", "gpt-image-2.5-sunburst"},
 	{"日耀", "gpt-image-2.5-sunburst"},
 	{"日耀版", "gpt-image-2.5-sunburst"},
@@ -66,6 +70,9 @@ var modelAliases = []struct {
 	{"gptimage 2.5", "gpt-image-2.5"},
 	{"image 2.5", "gpt-image-2.5"},
 	{"image2.5", "gpt-image-2.5"},
+	{"img 2.5", "gpt-image-2.5"},
+	{"image 二点五", "gpt-image-2.5"},
+	{"二点五", "gpt-image-2.5"},
 	{"2.5", "gpt-image-2.5"},
 	{"gpt-image-2", "gpt-image-2"},
 	{"gpt image 2", "gpt-image-2"},
@@ -73,14 +80,21 @@ var modelAliases = []struct {
 	{"gptimage2", "gpt-image-2"},
 	{"image 2", "gpt-image-2"},
 	{"image2", "gpt-image-2"},
-	{"gpt", "gpt-image-2"},
+	{"image 2.0", "gpt-image-2"},
+	{"gpt image 2.0", "gpt-image-2"},
+	{"img 2", "gpt-image-2"},
+	{"image 二", "gpt-image-2"},
+	{"2", "gpt-image-2"},
+	{"gpt", defaultModel},
+	{"gpt image", defaultModel},
 	{"grok-imagine-image-quality", "grok-imagine-image-quality"},
 	{"grok imagine image quality", "grok-imagine-image-quality"},
 	{"grok imagine quality", "grok-imagine-image-quality"},
 	{"grok quality", "grok-imagine-image-quality"},
 	{"imagine quality", "grok-imagine-image-quality"},
 	{"grok 高质量", "grok-imagine-image-quality"},
-	{"高质量", "grok-imagine-image-quality"},
+	{"grok 高质量版", "grok-imagine-image-quality"},
+	{"grok 质量版", "grok-imagine-image-quality"},
 	{"grok-imagine-image-2.0", "grok-imagine-image-2.0"},
 	{"grok imagine image 2.0", "grok-imagine-image-2.0"},
 	{"grok imagine 2.0", "grok-imagine-image-2.0"},
@@ -134,7 +148,7 @@ func endpoint(base, operation string) string {
 
 // resolveSize 接受 1K/2K/4K、auto，或 WIDTHxHEIGHT。发给上游的永远是后两种。
 func resolveSize(size string) (string, error) {
-	size = strings.TrimSpace(size)
+	size = normalizeSize(size)
 	if size == "" {
 		size = defaultSize
 	}
@@ -156,14 +170,38 @@ func resolveSize(size string) (string, error) {
 	return fmt.Sprintf("%dx%d", w, h), nil
 }
 
-func normalizeKey(s string) string {
-	s = strings.ToLower(strings.TrimSpace(s))
-	s = strings.NewReplacer("-", " ", "_", " ").Replace(s)
-	return strings.Join(strings.Fields(s), " ")
+func normalizeWidth(value string) string {
+	return strings.Map(func(character rune) rune {
+		if character >= '！' && character <= '～' {
+			return character - 0xFEE0
+		}
+		return character
+	}, value)
+}
+
+func normalizeKey(value string) string {
+	value = strings.ToLower(normalizeWidth(value))
+	value = strings.NewReplacer("-", "", "_", "").Replace(value)
+	return strings.Join(strings.Fields(value), "")
+}
+
+func normalizeSize(size string) string {
+	size = strings.ToUpper(strings.Join(strings.Fields(normalizeWidth(size)), ""))
+	size = strings.ReplaceAll(size, "×", "X")
+	switch size {
+	case "一K":
+		return "1K"
+	case "二K", "两K":
+		return "2K"
+	case "四K":
+		return "4K"
+	}
+	return size
 }
 
 func isVideoModel(model string) bool {
-	return strings.Contains(strings.ToLower(model), "video")
+	key := normalizeKey(model)
+	return strings.Contains(key, "video") || strings.Contains(key, "视频")
 }
 
 func isGrokImage(model string) bool {
@@ -181,6 +219,9 @@ func resolveModel(model string) (string, error) {
 		return "", errors.New("video models are not supported; use a GPT or Grok image model")
 	}
 	key := normalizeKey(model)
+	if key == "高质量" || key == "高清" || key == "highquality" {
+		return "", errors.New("quality alone does not select a model; keep the current model and use --quality high, or explicitly choose Grok 高质量")
+	}
 	for _, item := range modelAliases {
 		if key == normalizeKey(item.alias) {
 			return item.id, nil
@@ -190,7 +231,7 @@ func resolveModel(model string) (string, error) {
 }
 
 func grokResolution(size string) (res, pixel, note string) {
-	size = strings.TrimSpace(size)
+	size = normalizeSize(size)
 	if size == "" {
 		size = defaultSize
 	}
@@ -293,7 +334,7 @@ func resultJSON(spec imageSpec, outputs any) map[string]any {
 }
 
 func requestedBand(size string) string {
-	size = strings.TrimSpace(size)
+	size = normalizeSize(size)
 	u := strings.ToUpper(size)
 	if u == "1K" || u == "2K" || u == "4K" {
 		return u
@@ -728,7 +769,7 @@ func printJSON(value any) {
 
 func parseCommon(fs *flag.FlagSet, argv []string, args *commonArgs) error {
 	var timeout float64
-	fs.StringVar(&args.model, "model", defaultModel, "image model (default gpt-image-2; GPT or Grok image ids, not video)")
+	fs.StringVar(&args.model, "model", defaultModel, "image model (default gpt-image-2.5; Image 2, Image 2.5, GPT or Grok image ids, not video)")
 	fs.StringVar(&args.size, "size", defaultSize, "1K, 2K, 4K, auto, or WIDTHxHEIGHT")
 	fs.StringVar(&args.quality, "quality", defaultQuality, "low, medium, high, or auto")
 	fs.IntVar(&args.n, "n", 1, "number of variants (1-10)")
@@ -906,8 +947,9 @@ func runBatch(argv []string) error {
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "Usage: codex-image2 <generate|generate-batch|edit> [options]")
-	fmt.Fprintln(os.Stderr, "Defaults: --model gpt-image-2  --size 1K  --quality auto")
+	fmt.Fprintln(os.Stderr, "Codex Image 2.5")
+	fmt.Fprintln(os.Stderr, "Usage: codex-image2-5 <generate|generate-batch|edit> [options]")
+	fmt.Fprintln(os.Stderr, "Defaults: --model gpt-image-2.5  --size 1K  --quality auto")
 	fmt.Fprintln(os.Stderr, "GPT:   gpt-image-2  gpt-image-2.5  gpt-image-2.5-flare  gpt-image-2.5-sunburst")
 	fmt.Fprintln(os.Stderr, "Grok:  grok-imagine  grok-imagine-image-2.0  grok-imagine-image-quality")
 	fmt.Fprintln(os.Stderr, "Video models are not supported.")

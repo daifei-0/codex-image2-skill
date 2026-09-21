@@ -1,347 +1,185 @@
-# Codex Image2 Skill（鹊桥转存）
+# Codex Image 2.5 Skill（鹊桥维护）
 
-让 Codex 通过自定义 API 地址和密钥生成或编辑图片。默认模型是 GPT Image 2（`gpt-image-2`），默认画质是 `1K`。对话里可以换成 GPT 或 Grok 的生图模型，以及 `1K` / `2K` / `4K`。**不含 Video。** 不要改配置文件，也不用重启客户端。
+让 Codex 通过你配置的 OpenAI 兼容 API 生成和编辑图片。默认 **GPT Image 2.5（`gpt-image-2.5`）+ 1K**，也支持 Image 2、闪焰、日耀和 Grok 生图模型。
 
-## 为什么做这个 Skill
+日常直接说「用 Image 2」「换 2.5」「这张用 4K」即可。同一对话保留已经选择的模型和分辨率，换模型、换画质都不用改配置或重启。
 
-最近使用 API 中转服务时，我发现不少中转站已经把 `gpt-image-2` 从常规模型列表中移出，导致 Codex 无法像以前一样直接发现并调用生图模型。
+- 仓库：**codex-image2-5-skill**
+- 显示名称：**Codex Image 2.5**
+- 技能名称及安装目录：**codex-image2-5**
+- 调用方式：`$codex-image2-5`
+- 支持文生图、单图/多图编辑、PNG Mask、JSONL 批量生图；不支持视频。
+- 内置 Windows x64/ARM64、macOS Intel/Apple Silicon 程序，无需安装 Python、Node.js 或 Go。
 
-于是我写了这个 Skill。原理很简单：
+## 安装或升级
 
-1. 从环境变量读取 API 地址和密钥；
-2. 直接调用 OpenAI 兼容的图片生成或编辑接口；
-3. 将返回的图片保存到项目中；
-4. 让 Codex 检查图片并展示最终结果。
-
-仓库已经提供 Windows 和 macOS 的原生可执行文件。普通用户不需要安装 Python、Node.js、Go 或其他依赖。
-
-## 功能
-
-- 文生图
-- 单图或多图编辑
-- **对话里切换生图模型（不含 Video）**
-  - GPT：`gpt-image-2`（默认）、`gpt-image-2.5`、`gpt-image-2.5-flare`、`gpt-image-2.5-sunburst`
-  - Grok：`grok-imagine`、`grok-imagine-image-2.0`（说「Grok」时默认这个）、`grok-imagine-image-quality`
-- **对话里切换画质**：不说就用 `1K`。GPT 支持 `1K` / `2K` / `4K`；Grok 官方是 `1K` / `2K`，说 4K 会打到上游最高档（约 2816×1584，不是真 4K）
-- 不用改配置文件，也不用重启 Codex
-- 可选 PNG Mask 局部编辑
-- JSONL 并发批量生图，单条任务可覆盖 `model` / `size`
-- 支持 Base64 和 URL 两种图片响应
-- 自动重试网络超时、429、5xx 和 524 错误
-- 输出文件覆盖保护
-- API Key 脱敏，不写入 Skill 或日志
-- 内置 Windows x64/ARM64 与 macOS Intel/Apple Silicon 可执行文件
-
-## 如何使用
-
-这个项目包含：
-
-- 开源项目：**codex-image2-skill**
-- Skill 名称：**codex-image2**
-
-### 1. 安装 Skill
-
-最简单的方式是把本项目地址发给 Codex，让它帮你安装：
+把下面这段发给 Codex：
 
 ```text
-请帮我安装这个 Skill：
-https://github.com/daifei-0/codex-image2-skill
+请帮我安装或更新 Codex Image 2.5：
+https://github.com/daifei-0/codex-image2-5-skill
+技能位于仓库内 codex-image2-5 目录。
+如果已装旧版 codex-image2，请先备份旧版到技能目录之外，再替换为新版，避免两个版本同时启用。
+保留已有 CODEX_API_URL 和 CODEX_API_KEY，不要打印密钥。
 ```
 
-也可以手动安装。
+旧版技能名称是 `codex-image2`。仅改 GitHub 仓库名不会更新已经安装的文件，需更新技能后使用 `$codex-image2-5`。已有 API 地址和密钥可继续使用；新默认模型要求令牌有 `gpt-image-2.5` 调用权限，模型价格以所用平台为准。
+
+手动安装（首次安装）：
 
 Windows PowerShell：
 
 ```powershell
-git clone https://github.com/daifei-0/codex-image2-skill.git
-Copy-Item codex-image2-skill\codex-image2 "$HOME\.codex\skills\codex-image2" -Recurse
+git clone https://github.com/daifei-0/codex-image2-5-skill.git
+Copy-Item codex-image2-5-skill\codex-image2-5 "$HOME\.codex\skills\codex-image2-5" -Recurse
 ```
 
-macOS / Linux：
+macOS：
 
 ```bash
-git clone https://github.com/daifei-0/codex-image2-skill.git
-cp -R codex-image2-skill/codex-image2 ~/.codex/skills/codex-image2
+git clone https://github.com/daifei-0/codex-image2-5-skill.git
+cp -R codex-image2-5-skill/codex-image2-5 ~/.codex/skills/codex-image2-5
+chmod +x ~/.codex/skills/codex-image2-5/bin/codex-image2-5-darwin-*
 ```
 
-### 2. 配置 API 地址和密钥
+## 配置 API
 
-在 PowerShell 中执行下面两条命令，可将环境变量永久保存到当前 Windows 用户：
+程序读取两个环境变量：
 
-```powershell
-[Environment]::SetEnvironmentVariable("CODEX_API_URL", "你的API地址", "User")
-[Environment]::SetEnvironmentVariable("CODEX_API_KEY", "你的API密钥", "User")
-```
+- `CODEX_API_URL`：API 根地址或以 `/v1` 结尾的地址。
+- `CODEX_API_KEY`：你自己的 API 密钥，只在本机安全设置，不发到聊天、截图或仓库。
 
-例如，你的 API 地址可能是：
+使用鹊桥时，地址填写 `https://cdn.5202828.xyz/v1`。在控制台创建具有目标生图模型权限的令牌。
+
+Windows 可在系统「编辑账户的环境变量」中设置以上两项。macOS 可在自己的 shell 环境中设置；从桌面启动的客户端需要能继承该环境。不要把密钥写进 SKILL.md。
+
+**如果正在运行的客户端没有读取新设置的环境变量，完全退出后重新打开。日常切换模型、分辨率不需要重启。** 已有配置无需重设。
+
+## 白话文切换模型
+
+明确指定的模型优先；没指定的选项沿用本对话已有选择。新对话没有选择时才使用 Image 2.5 + 1K。
+
+| 你说 | 实际模型 |
+| --- | --- |
+| 新对话不指定模型 / GPT / GPT Image | `gpt-image-2.5` |
+| Image 2 / image2 / GPT Image 2 / img2 / Image 二 | `gpt-image-2` |
+| Image 2.5 / image2.5 / 2.5 / 二点五 | `gpt-image-2.5` |
+| 闪焰 / 闪焰版 / flare / Image 2.5 flare | `gpt-image-2.5-flare` |
+| 日耀 / 日耀版 / sunburst / Image 2.5 sunburst | `gpt-image-2.5-sunburst` |
+| Grok / Grok 2 / Grok 2.0 | `grok-imagine-image-2.0` |
+| Grok 高质量 / Grok 质量版 / Grok quality | `grok-imagine-image-quality` |
+| 点名 grok-imagine / Grok Imagine | `grok-imagine` |
+
+模型别名不区分英文字母大小写，支持常见空格、连字符、下划线及全角字母数字。CLI 的 `--model` 接收模型名或别名，完整聊天句子由 Codex 提取模型与分辨率。
+
+**Image 2 与 Image 2.5 是不同模型。** 技能名称里的「2.5」不覆盖你明确选择的 Image 2。只说「高质量一点」保留当前模型，提高其质量参数，不会自动跳到 Grok。画面文字、尺寸中的数字也不会被当成模型名。
+
+连续对话示例：
 
 ```text
-https://example.com
+使用 $codex-image2-5，用 Image 2，2K，画一张海边日出。
+这张改成 4K，模型不变。
+换 Image 2.5 再画一张，分辨率不变。
+改用 Grok，2K。
+还是这个模型，画一张雪山。
 ```
 
-既可以填写服务根地址，也可以填写以 `/v1` 结尾的地址，Skill 会自动整理接口路径。
+以上分别使用 Image 2 + 2K、Image 2 + 4K、Image 2.5 + 4K、Grok + 2K、Grok + 2K。
 
-![配置 Codex Image2 环境变量](http://image.fengfengzhidao.com/fengfeng_110920260715224031.png?key=fengfengbuzhidao)
+## 1K / 2K / 4K
 
-> **重启只针对 API 地址和密钥。** 配完这两项后完全退出再打开 Codex，密钥才会生效。之后换模型、换画质都在对话里说，不要去改配置文件，也不要再重启。
+「2K」「2k」「2 K」「两K」「二K」都表示 2K。「一K」「四K」同理。只改分辨率时保留模型，只改模型时保留分辨率。「高清一点」没有指定像素档位，不擅自切换为收费可能更高的 4K。
 
-macOS / Linux 用户可以将以下内容加入自己的 shell 配置文件：
-
-```bash
-export CODEX_API_URL="你的API地址"
-export CODEX_API_KEY="你的API密钥"
-```
-
-### 3. 对话里生图：怎么切换模型、怎么切换画质
-
-安装好 Skill、配好密钥并重启过一次 Codex 之后，日常用法就是跟它说话。**不要把模型或画质写进配置文件。** 每次请求点名即可，Skill 会给这一次调用带上对应参数。
-
-默认（这句话里不提模型和画质）：
-
-- 模型：`gpt-image-2`（GPT Image 2）
-- 画质：`1K`
-
-可选生图模型如下，**不含** `grok-imagine-video` / `grok-imagine-video-1.5`。
-
-**GPT**
-
-| 你在对话里说 | 这一次实际用 |
-| --- | --- |
-| 不提 / GPT / GPT Image 2 | `gpt-image-2` |
-| 2.5 / GPT Image 2.5 | `gpt-image-2.5` |
-| 闪焰 / flare | `gpt-image-2.5-flare` |
-| 日耀 / sunburst | `gpt-image-2.5-sunburst` |
-
-**Grok**
-
-| 你在对话里说 | 这一次实际用 |
-| --- | --- |
-| Grok（只说 Grok） | `grok-imagine-image-2.0` |
-| Grok 2.0 / grok-imagine-image-2.0 | `grok-imagine-image-2.0` |
-| Grok 高质量 / grok-imagine-image-quality | `grok-imagine-image-quality` |
-| grok-imagine（点名这个 id） | `grok-imagine` |
-
-画质单独说：
-
-| 你在对话里说 | GPT | Grok |
+| 选择 | GPT 请求尺寸 | Grok 当前适配 |
 | --- | --- | --- |
-| 不提画质 | `1K`（约 1024×1024） | `1k`（实测 1024×1024） |
-| 画质 2K | `2048×2048` | `2048×2048`（`resolution=2k` + `size=2048x2048`） |
-| 画质 4K | 约 `3584×2016`（4K 档，不是严格 3840×2160） | 官方无 4K；会打到上游最高档，约 `2816×1584`，Skill 会说明不是真 4K |
+| 1K | 1024×1024 | 1k + 1024×1024 |
+| 2K | 2048×2048 | 2k + 2048×2048 |
+| 4K | 3840×2160 | 请求上游最高档，不能保证原生 4K |
 
-同一段对话里下一句换说法就行，立即生效，不用重开客户端。
+以上是请求参数，最终像素以输出 `actual_size` 为准。部分上游可能降档或返回其他尺寸；程序会检查可识别图片的实际尺寸并对降档发出警告。Grok 当前4K适配仍发2k分辨率参数和较大size，历史上可返回约2816×1584，不能称为原生4K；GPT也不能仅凭请求参数保证3840×2160。
 
-默认生图：
+`--quality low|medium|high|auto` 是独立的质量参数，不等于 1K/2K/4K。Grok 模型的支持范围按现有适配处理。
 
-```text
-使用 $codex-image2 生成一张图片：
-一只戴着宇航员头盔的橘猫站在月球表面，远处可以看到地球，电影感灯光。
-```
+## 改图
 
-换成 GPT Image 2.5：
+附上图片后说：
 
 ```text
-使用 $codex-image2，模型用 2.5，生成一张图片：
-一只戴着宇航员头盔的橘猫站在月球表面，远处可以看到地球，电影感灯光。
-```
-
-换成 GPT 闪焰 / 日耀：
-
-```text
-使用 $codex-image2，用闪焰，画质 2K：
-一只戴着宇航员头盔的橘猫站在月球表面，远处可以看到地球，电影感灯光。
-```
-
-换成 Grok：
-
-```text
-使用 $codex-image2，用 Grok，画质 2K：
-一只戴着宇航员头盔的橘猫站在月球表面，远处可以看到地球，电影感灯光。
-```
-
-Grok 高质量档：
-
-```text
-使用 $codex-image2，用 Grok 高质量：
-一只戴着宇航员头盔的橘猫站在月球表面，远处可以看到地球，电影感灯光。
-```
-
-换成 4K 画质（GPT 才是真 4K；Grok 会落到 2K）：
-
-```text
-使用 $codex-image2，画质 4K，生成一张图片：
-一只戴着宇航员头盔的橘猫站在月球表面，远处可以看到地球，电影感灯光。
-```
-
-模型和画质一起改：
-
-```text
-使用 $codex-image2，模型 gpt-image-2.5，画质 4K：
-一只戴着宇航员头盔的橘猫站在月球表面，远处可以看到地球，电影感灯光。
-```
-
-同一轮对话里接着换：
-
-```text
-还是这只猫，改用 Grok，画质 2K 再出一张。
-```
-
-改图也可以带上模型和画质：
-
-```text
-使用 $codex-image2，用 Grok，画质 2K，修改这张图片：
+使用 $codex-image2-5，用 Image 2.5，2K，修改这张图片：
 只把背景替换成雪山，人物、服装、姿势和构图保持不变。
 ```
 
-![使用 Codex Image2 生图](http://image.fengfengzhidao.com/fengfeng_110920260715224141.png?key=fengfengbuzhidao)
+支持多张参考图、可选 PNG Mask；输出另存，不覆盖原图。
 
 ## CLI 用法
 
-通常直接在 Codex 对话里指定 `$codex-image2`，并在同一句话里说模型和画质。不需要手动执行 CLI，也不需要为切换模型和画质改任何文本配置。
+普通用户在对话中使用即可，以下用于自动化或调试。
 
-下面的命令只适合调试或自动化。
-
-选择与你的系统匹配的文件：
-
-| 系统 | 可执行文件 |
+| 系统 | 程序 |
 | --- | --- |
-| Windows x64 | `codex-image2/bin/codex-image2-windows-amd64.exe` |
-| Windows ARM64 | `codex-image2/bin/codex-image2-windows-arm64.exe` |
-| macOS Intel | `codex-image2/bin/codex-image2-darwin-amd64` |
-| macOS Apple Silicon | `codex-image2/bin/codex-image2-darwin-arm64` |
+| Windows x64 | `codex-image2-5/bin/codex-image2-5-windows-amd64.exe` |
+| Windows ARM64 | `codex-image2-5/bin/codex-image2-5-windows-arm64.exe` |
+| macOS Intel | `codex-image2-5/bin/codex-image2-5-darwin-amd64` |
+| macOS Apple Silicon | `codex-image2-5/bin/codex-image2-5-darwin-arm64` |
 
-macOS 如果提示没有执行权限，运行：
-
-```bash
-chmod +x codex-image2/bin/codex-image2-darwin-*
-```
-
-生成图片：
+默认生图：
 
 ```powershell
-& "codex-image2/bin/codex-image2-windows-amd64.exe" generate `
+& "codex-image2-5/bin/codex-image2-5-windows-amd64.exe" generate `
   --prompt "A tiny blue nebula inside a glass bottle" `
-  --model gpt-image-2 `
-  --size 1K `
-  --quality auto `
   --out "output/imagegen/nebula.png"
 ```
 
-换成 2.5 和 4K：
+指定口语别名、仅校验参数，不调用 API：
 
 ```powershell
-& "codex-image2/bin/codex-image2-windows-amd64.exe" generate `
-  --prompt "A tiny blue nebula inside a glass bottle" `
-  --model gpt-image-2.5 `
-  --size 4K `
-  --quality auto `
-  --out "output/imagegen/nebula-4k.png"
+& "codex-image2-5/bin/codex-image2-5-windows-amd64.exe" generate `
+  --prompt "A seaside sunrise" `
+  --model "Image 2" `
+  --size "两K" `
+  --dry-run
 ```
 
-换成 Grok 2K：
+编辑：
 
 ```powershell
-& "codex-image2/bin/codex-image2-windows-amd64.exe" generate `
-  --prompt "A tiny blue nebula inside a glass bottle" `
-  --model grok-imagine-image-2.0 `
-  --size 2K `
-  --out "output/imagegen/nebula-grok.png"
-```
-
-GPT 的 `--size` 对照：`1K` → `1024x1024`，`2K` → `2048x2048`，`4K` → `3840x2160`（上游常见落地 `3584x2016`）。Grok 同时发 `resolution` 和 `size`：`1K` → `1k`/`1024x1024`，`2K` → `2k`/`2048x2048`，`4K` → `2k`/`3840x2160`（6rr 最高约 `2816x1584`）。`--quality` 仍是 `low|medium|high|auto`，和画质档位不是一回事。
-
-编辑图片：
-
-```powershell
-& "codex-image2/bin/codex-image2-windows-amd64.exe" edit `
+& "codex-image2-5/bin/codex-image2-5-windows-amd64.exe" edit `
   --image "input.png" `
   --prompt "Replace only the background with a warm studio backdrop" `
+  --model "Image 2.5" `
+  --size 2K `
   --out "output/imagegen/edited.png"
 ```
 
-批量任务格式和完整工作流请查看 [`codex-image2/SKILL.md`](codex-image2/SKILL.md) 和 [`batch-format.md`](codex-image2/references/batch-format.md)。
+批量格式见 [batch-format.md](codex-image2-5/references/batch-format.md)，完整技能说明见 [SKILL.md](codex-image2-5/SKILL.md)。
 
-## 从源码构建
-
-普通用户不需要执行这一步。开发者安装 Go 后，可以运行：
+从源码构建 Windows x64（Go 标准库，无第三方依赖）：
 
 ```powershell
 $env:CGO_ENABLED = "0"
 $env:GOOS = "windows"
 $env:GOARCH = "amd64"
-go build -trimpath -ldflags "-s -w" -o codex-image2/bin/codex-image2-windows-amd64.exe codex-image2/src/image_gen.go
+go build -trimpath -ldflags "-s -w" -o codex-image2-5/bin/codex-image2-5-windows-amd64.exe codex-image2-5/src/image_gen.go
 ```
 
-源码只使用 Go 标准库。
+## 鹊桥在线生图与教程
 
-## 超简单的方式
-
-如果觉得安装 Skill 和配置环境变量还是太麻烦，也可以直接使用鹊桥的在线生图页面：
-
-### [https://cdn.5202828.xyz](https://cdn.5202828.xyz)
-
-登录鹊桥后打开 [在线生图](https://cdn.5202828.xyz/draw/)，支持文生图和图生图，同样使用 `gpt-image-2`，打开网页即可使用，不需要安装任何东西。
+不安装技能也可以使用 [鹊桥在线生图](https://cdn.5202828.xyz/draw/)，网页支持的模型以页面为准。
 
 ![鹊桥在线生图](docs/images/queqiao-draw.jpg)
 
-本 Skill 配置里的 `CODEX_API_URL` 也可以直接填鹊桥地址 `https://cdn.5202828.xyz/v1`，密钥使用在鹊桥创建的令牌。
+[鹊桥使用教程与常见问题](https://cdn.5202828.xyz/docs/faq.html)
 
 ## 常见问题
 
-### 配置后仍提示没有 API Key
+- **找不到新版技能**：更新后确认目录和名称都是 `codex-image2-5`，重新加载技能列表或开启新对话；旧安装不会随着仓库改名自动升级。
+- **401 / 模型不可用**：检查令牌是否有效、分组及模型权限是否包含所选模型。程序不会偷偷换模型。
+- **没有 API Key**：确认本机环境变量以及客户端进程是否已读取配置。
+- **524 / 超时 / 429**：程序已有有限次数重试；仍失败时可减少批量并发、选1K或稍后再试，不会无限重试。
+- **图片没有达到请求分辨率**：查看 `actual_size` 和 `warning`，按实际像素判断，不把请求档位当成生成结果。
+- **视频**：此技能仅处理图片，拒绝视频模型。
+- **其他中转站**：需兼容 `POST /v1/images/generations`、`POST /v1/images/edits`，并提供所选模型。
 
-完全退出 Codex 后重新启动。已经打开的 Codex 进程不会自动读取新设置的用户环境变量。换模型、换画质不走这条路径，对话里说就行。
+## 关于本仓库与许可
 
-### 切换模型和画质要不要重启？
-
-不要。只有第一次配置 `CODEX_API_URL` / `CODEX_API_KEY` 才需要重启。之后在对话里说「用 2.5」「用 Grok」「用闪焰」「画质 4K」即可。
-
-### 支持哪些模型？Video 呢？
-
-支持截图里的生图模型：GPT 四个（`gpt-image-2`、`gpt-image-2.5`、`gpt-image-2.5-flare`、`gpt-image-2.5-sunburst`）和 Grok 三个（`grok-imagine`、`grok-imagine-image-2.0`、`grok-imagine-image-quality`）。**不支持** `grok-imagine-video` 和 `grok-imagine-video-1.5`。
-
-### Grok 能开 2K / 4K 吗？
-
-Grok Imagine 官方分辨率只有 `1k` 和 `2k`，没有 4K。鹊桥侧已经打开 Grok 通道的 body 透传，并把 OpenAI 的 `size` 补成 6rr 认的 `resolution`。现在：
-
-- 2K 会出 **2048×2048**
-- 4K 没有真 4K，会出上游最高档，约 **2816×1584**。Skill 仍会提示这不是 4K，不会把 2K 图说成 4K
-
-GPT 四个生图模型 1K / 2K 按像素出图；请求 4K 时 OpenAI/6rr 会落到约 `3584×2016`（仍按 4K 档计，不是严格 3840×2160）。这不是鹊桥把 `size` 剥掉，也不是肥嘟嘟改了尺寸。
-
-### 接口返回 524 或超时
-
-这通常表示中转服务的图片生成耗时超过了网关限制。可以尝试 `--quality low`、`--size 1K`、减少批量并发，或稍后重试。
-
-### 是否支持所有中转站
-
-中转服务需要兼容以下接口，并提供你实际传入的生图模型（默认 `gpt-image-2`，也可传 GPT 2.5/闪焰/日耀或 Grok Imagine 生图）：
-
-```text
-POST /v1/images/generations
-POST /v1/images/edits
-```
-
-不同服务的参数支持和稳定性可能存在差异。
-
-## 安全说明
-
-- 不要把真实 API Key 提交到 GitHub。
-- 不要把 Key 写进 Skill、提示词、截图或聊天消息。
-- 建议为不同服务使用独立密钥，并定期轮换。
-- 本 Skill 只从 `CODEX_API_KEY` 环境变量读取密钥，不会主动保存密钥。
-
-## License
-
-[MIT](LICENSE)
-
-## 关于本仓库
-
-本仓库是 **鹊桥** 对开源项目 [fengfengzhidao/codex-image2-skill](https://github.com/fengfengzhidao/codex-image2-skill) 的 **转存备份**。
-
-- 原作者：[fengfengzhidao](https://github.com/fengfengzhidao)，原仓库地址：https://github.com/fengfengzhidao/codex-image2-skill
-- 转存目的：鹊桥的用户会长期通过本地址安装这个 Skill，为避免原仓库失效、删除或不可访问导致安装失败，这里做了一份完整转存。
-- 转存内容：Skill 目录、可执行文件、源码和许可证来自原仓库；仓库名和 Skill 名（`codex-image2`）未改。本 README 补充了转存说明、安装地址，以及对话里切换生图模型和 1K/2K/4K 画质的用法。
-- 许可证：沿用原项目的 [MIT](LICENSE) 许可，版权归原作者所有。
-
-如果你需要最新版本或想参与开发，请优先访问原仓库。
+本项目由鹊桥基于 [fengfengzhidao/codex-image2-skill](https://github.com/fengfengzhidao/codex-image2-skill) 维护和适配，保留原作者归属及 [MIT 许可证](LICENSE)。本维护版本增加多模型与分辨率适配、对话切换和别名识别，并更名为 Codex Image 2.5；不再描述为与原仓库完全一致的转存。
