@@ -1,4 +1,4 @@
-# Codex Image 2.5 Skill（鹊桥维护）
+# Codex Image 2.5 Skill（鹊桥赞助支持）
 
 让 Codex 通过你配置的 OpenAI 兼容 API 生成和编辑图片。默认 **GPT Image 2.5（`gpt-image-2.5`）+ 1K**，也支持 Image 2、闪焰、日耀和 Grok 生图模型。
 
@@ -182,4 +182,4 @@ go build -trimpath -ldflags "-s -w" -o codex-image2-5/bin/codex-image2-5-windows
 
 ## 关于本仓库与许可
 
-本项目由鹊桥基于 [fengfengzhidao/codex-image2-skill](https://github.com/fengfengzhidao/codex-image2-skill) 维护和适配，保留原作者归属及 [MIT 许可证](LICENSE)。本维护版本增加多模型与分辨率适配、对话切换和别名识别，并更名为 Codex Image 2.5；不再描述为与原仓库完全一致的转存。
+本项目作者为 [daifei-0](https://github.com/daifei-0)，由鹊桥赞助支持，采用 [MIT 许可证](LICENSE)。本版本支持多模型与分辨率适配、对话切换和别名识别。
